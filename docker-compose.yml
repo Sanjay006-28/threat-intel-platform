@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  sentinel-tip:
+    build: .
+    container_name: sentinel-tip
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:///./threat_intel.db
+      - DEV_AUTO_LOGIN=True
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=changeme123
+      - SECRET_KEY=supersecretkey-sentinel-cti-platform
+      - AUTO_INGEST_DIR=./auto_ingest
+    volumes:
+      - ./threat_intel.db:/app/threat_intel.db
+      - ./auto_ingest:/app/auto_ingest
+    restart: unless-stopped

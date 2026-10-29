@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% block title %}Security Alerts - SENTINEL CTI{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h3 class="fw-bold mb-1">Correlated Threat Alerts</h3>
+        <p class="text-secondary small mb-0">High-fidelity incidents identified by correlating live logs with active threat intelligence.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="/logs" class="btn btn-sm btn-outline-info">
+            <i class="bi bi-file-earmark-arrow-up"></i> Ingest New Log
+        </a>
+    </div>
+</div>
+
+<div class="card card-soc">
+    <div class="card-soc-header">
+        <span class="fw-semibold text-white">Active Detections ({{ enriched_alerts|length }})</span>
+        <span class="badge bg-secondary font-mono">Live Correlation Stream</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-soc align-middle mb-0">
+            <thead>
+                <tr>
+                    <th style="width: 60px;">ID</th>
+                    <th>Threat Indicator</th>
+                    <th>Origin / Context</th>
+                    <th>MITRE ATT&CK</th>
+                    <th>Severity</th>
+                    <th>Status</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in enriched_alerts %}
+                {% set alert = item.alert %}
+                {% set mitre = item.mitre %}
+                {% set enc = item.enrichment %}
+                <tr>
+                    <td class="font-mono text-muted">#{{ alert.id }}</td>
+                    <td>
+                        <div class="d-flex flex-column">
+                            <span class="font-mono fw-bold text-white text-break" style="font-size: 0.88rem;">{{ alert.matched_value }}</span>
+                            <span class="badge bg-dark border border-secondary text-info text-uppercase font-mono mt-1 align-self-start" style="font-size: 0.65rem;">
+                                {{ alert.matched_type }}
+                            </span>
+                        </div>
+                    </td>
+                    <td>
+                        {% if enc and enc.is_enriched %}
+                        <div class="d-flex flex-column">
+                            <span class="text-white small fw-medium">
+                                <i class="bi bi-geo-alt text-danger"></i> {{ enc.country }} ({{ enc.country_code }})
+                            </span>
+                            <small class="text-muted text-truncate" style="max-width: 180px;" title="{{ enc.org }}">
+                                {{ enc.org or enc.isp }}
+                            </small>
+                        </div>
+                        {% else %}
+                        <span class="text-muted small">Local / Internal</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if mitre %}
+                        <div class="d-flex flex-column gap-1">
+                            <span class="badge bg-secondary font-mono align-self-start" style="font-size: 0.68rem;">
+                                {{ mitre.technique_id }}: {{ mitre.technique_name }}
+                            </span>
+                            <span class="text-muted small" style="font-size: 0.72rem;">{{ mitre.tactic }}</span>
+                        </div>
+                        {% else %}
+                        <span class="text-muted small">Generic</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge badge-severity-{{ alert.severity }} px-2 py-1">
+                            {{ alert.severity|upper }} ({{ alert.score }})
+                        </span>
+                    </td>
+                    <td>
+                        <form action="/alerts/{{ alert.id }}/status" method="POST" class="d-inline">
+                            <select name="status" class="form-select form-select-sm bg-dark text-white border-secondary" style="font-size: 0.78rem; width: 130px;" onchange="this.form.submit()">
+                                <option value="new" {% if alert.status == 'new' %}selected{% endif %}>New</option>
+                                <option value="investigating" {% if alert.status == 'investigating' %}selected{% endif %}>Investigating</option>
+                                <option value="resolved" {% if alert.status == 'resolved' %}selected{% endif %}>Resolved</option>
+                                <option value="false_positive" {% if alert.status == 'false_positive' %}selected{% endif %}>False Positive</option>
+                            </select>
+                        </form>
+                    </td>
+                    <td class="text-end">
+                        <div class="btn-group btn-group-sm">
+                            <button type="button" class="btn btn-outline-warning" title="View Containment Rules" onclick="openRemediationModal('{{ alert.id }}', '{{ alert.matched_value }}', '{{ alert.matched_type }}')">
+                                <i class="bi bi-shield-slash"></i> Remediate
+                            </button>
+                            <a href="/alerts/{{ alert.id }}/report" class="btn btn-outline-info" title="Download Full Incident Report">
+                                <i class="bi bi-file-earmark-text"></i> Report
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center py-4 text-muted">
+                        No alerts generated yet. Ingest a log file from the <a href="/logs" class="text-info">Log Ingestion</a> tab to start correlation.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Remediation Modal -->
+<div class="modal fade" id="remediationModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark border-secondary text-white">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title font-mono" id="remedTitle">
+                    <i class="bi bi-shield-slash text-warning"></i> Automated Containment Rules
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-secondary small mb-3">Copy-paste ready remediation rules for firewalls, DNS sinks, and Intrusion Detection Systems.</p>
+                
+                <div id="remedLoading" class="text-center py-3">
+                    <div class="spinner-border text-info" role="status"></div>
+                </div>
+
+                <div id="remedContent" style="display: none;">
+                    <div class="mb-3" id="iptablesWrap">
+                        <label class="form-label small text-info fw-bold">Linux Firewall (iptables):</label>
+                        <pre class="bg-black p-2 rounded border border-secondary text-warning font-mono small" id="iptablesCode"></pre>
+                    </div>
+                    <div class="mb-3" id="windowsWrap">
+                        <label class="form-label small text-info fw-bold">Windows Defender Firewall (PowerShell):</label>
+                        <pre class="bg-black p-2 rounded border border-secondary text-info font-mono small" id="windowsCode"></pre>
+                    </div>
+                    <div class="mb-3" id="dnsWrap">
+                        <label class="form-label small text-info fw-bold">DNS Sinkhole (Pi-hole / Hosts):</label>
+                        <pre class="bg-black p-2 rounded border border-secondary text-success font-mono small" id="dnsCode"></pre>
+                    </div>
+                    <div class="mb-3" id="idsWrap">
+                        <label class="form-label small text-info fw-bold">Suricata / Snort Rule:</label>
+                        <pre class="bg-black p-2 rounded border border-secondary text-white font-mono small" id="idsCode"></pre>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openRemediationModal(alertId, val, typ) {
+    const modal = new bootstrap.Modal(document.getElementById('remediationModal'));
+    document.getElementById('remedTitle').innerHTML = `<i class="bi bi-shield-slash text-warning"></i> Containment: ${val}`;
+    document.getElementById('remedLoading').style.display = 'block';
+    document.getElementById('remedContent').style.display = 'none';
+    modal.show();
+
+    fetch(`/alerts/${alertId}/remediation`)
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('remedLoading').style.display = 'none';
+            document.getElementById('remedContent').style.display = 'block';
+
+            function setField(wrapId, codeId, val) {
+                const wrap = document.getElementById(wrapId);
+                const code = document.getElementById(codeId);
+                if (val) {
+                    wrap.style.display = 'block';
+                    code.textContent = val;
+                } else {
+                    wrap.style.display = 'none';
+                }
+            }
+
+            setField('iptablesWrap', 'iptablesCode', data.iptables);
+            setField('windowsWrap', 'windowsCode', data.windows_firewall);
+            setField('dnsWrap', 'dnsCode', data.dns_sinkhole);
+            setField('idsWrap', 'idsCode', data.suricata_snort);
+        })
+        .catch(err => {
+            document.getElementById('remedLoading').innerHTML = '<span class="text-danger">Failed to load remediation rules.</span>';
+        });
+}
+</script>
+{% endblock %}

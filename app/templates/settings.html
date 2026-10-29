@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block title %}Settings & Integration - SENTINEL CTI{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h3 class="fw-bold mb-1">Platform Settings & Integrations</h3>
+        <p class="text-secondary small mb-0">Configure real-time alert webhooks, STIX 2.1 intelligence sharing, and false-positive whitelists.</p>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Webhook Integration Card -->
+    <div class="col-12 col-lg-6">
+        <div class="card card-soc h-100" style="border-left: 3px solid var(--accent-rose);">
+            <div class="card-soc-header">
+                <span class="fw-semibold text-white">
+                    <i class="bi bi-bell-fill text-danger"></i> Real-Time Alert Webhooks
+                </span>
+                <span class="badge bg-secondary font-mono">Discord / Slack / Generic</span>
+            </div>
+            <div class="p-3">
+                <p class="text-secondary small mb-3">
+                    Automatically dispatch an instant notification whenever the correlation engine detects a <span class="badge badge-severity-critical">CRITICAL</span> or <span class="badge badge-severity-high">HIGH</span> incident.
+                </p>
+                <form action="/settings/webhook" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label small text-secondary">Incoming Webhook URL:</label>
+                        <input type="url" name="webhook_url" class="form-control form-control-sm bg-dark text-white border-secondary font-mono" placeholder="https://discord.com/api/webhooks/... or Slack" value="{{ webhook_url }}" required>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <button type="button" class="btn btn-sm btn-outline-warning" onclick="testCurrentWebhook()">
+                            <i class="bi bi-send-check"></i> Test Notification
+                        </button>
+                        <button type="submit" class="btn btn-sm btn-danger">
+                            <i class="bi bi-save"></i> Save Webhook URL
+                        </button>
+                    </div>
+                </form>
+                <div id="webhookTestMsg" class="small mt-2" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- STIX 2.1 Intelligence Sharing Card -->
+    <div class="col-12 col-lg-6">
+        <div class="card card-soc h-100" style="border-left: 3px solid var(--accent-cyan);">
+            <div class="card-soc-header">
+                <span class="fw-semibold text-white">
+                    <i class="bi bi-share-fill text-info"></i> STIX 2.1 Threat Sharing
+                </span>
+                <span class="badge bg-info text-dark font-mono">OASIS STANDARD</span>
+            </div>
+            <div class="p-3 d-flex flex-column justify-content-between">
+                <div>
+                    <p class="text-secondary small mb-2">
+                        Export active Indicators of Compromise in standard <strong>OASIS STIX 2.1 JSON bundle</strong> format for seamless ingestion by SIEMs (Splunk, Microsoft Sentinel), MISP, or external defense partners.
+                    </p>
+                    <ul class="text-secondary small ps-3 mb-3">
+                        <li>Strict STIX 2.1 Indicator pattern schema</li>
+                        <li>Includes hashes, URLs, C2 domains, and subnets</li>
+                        <li>Formatted with confidence scoring and validity timestamps</li>
+                    </ul>
+                </div>
+                <a href="/api/stix/export" class="btn btn-info text-dark fw-bold w-100 d-flex align-items-center justify-content-center gap-2">
+                    <i class="bi bi-download"></i>
+                    <span>Download STIX 2.1 Threat Bundle (.json)</span>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Global Whitelist Policies -->
+<div class="card card-soc mt-4">
+    <div class="card-soc-header">
+        <div>
+            <h6 class="fw-bold mb-0 text-white"><i class="bi bi-shield-check text-success"></i> Global Whitelist Suppression Policies</h6>
+            <small class="text-muted" style="font-size: 0.75rem;">Whitelisted values are excluded from alert generation to prevent false alarms.</small>
+        </div>
+    </div>
+    <div class="p-3">
+        <form action="/settings/whitelist/add" method="POST" class="row g-2 mb-4">
+            <div class="col-md-2">
+                <select name="type" class="form-select form-select-sm bg-dark text-white border-secondary" required>
+                    <option value="ipv4">IPv4 Address</option>
+                    <option value="domain">Domain</option>
+                    <option value="url">URL</option>
+                    <option value="hash">Hash</option>
+                    <option value="email">Email</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <input type="text" name="value" class="form-control form-control-sm bg-dark text-white border-secondary font-mono" placeholder="e.g., 8.8.8.8 or company-portal.com" required>
+            </div>
+            <div class="col-md-4">
+                <input type="text" name="description" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Reason (e.g., Internal DNS resolver)">
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-sm btn-success w-100">
+                    <i class="bi bi-plus-lg"></i> Add Policy
+                </button>
+            </div>
+        </form>
+
+        <div class="table-responsive">
+            <table class="table table-soc align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 120px;">Type</th>
+                        <th>Whitelisted Value</th>
+                        <th>Description</th>
+                        <th style="width: 80px;" class="text-end">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in whitelist %}
+                    <tr>
+                        <td><span class="badge bg-secondary font-mono">{{ entry.type|upper }}</span></td>
+                        <td class="font-mono text-white">{{ entry.value }}</td>
+                        <td class="text-muted small">{{ entry.description or 'No description' }}</td>
+                        <td class="text-end">
+                            <form action="/settings/whitelist/remove/{{ entry.id }}" method="POST" style="display:inline;">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Remove Rule">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="text-center py-3 text-muted">
+                            No active whitelist suppression policies. Add internal infrastructure above to suppress benign alerts.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function testCurrentWebhook() {
+    const input = document.querySelector('input[name="webhook_url"]');
+    const msg = document.getElementById('webhookTestMsg');
+    msg.style.display = 'block';
+    msg.className = 'small mt-2 text-info';
+    msg.textContent = 'Sending test notification...';
+
+    fetch('/api/webhook/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: input.value })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            msg.className = 'small mt-2 text-success fw-bold';
+            msg.textContent = '✓ Test webhook notification sent successfully!';
+        } else {
+            msg.className = 'small mt-2 text-warning';
+            msg.textContent = 'Notice: ' + data.message;
+        }
+    })
+    .catch(err => {
+        msg.className = 'small mt-2 text-danger';
+        msg.textContent = 'Failed to dispatch test notification.';
+    });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,34 @@
+# Virtual environment
+.venv/
+venv/
+ENV/
+env/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# Environment variables (keep .env.example)
+.env
+
+# SQLite Databases & temporary lock files
+*.db
+*.db-shm
+*.db-wal
+
+# Ingested logs and uploaded files
+auto_ingest/*.log
+auto_ingest/*.processed
+auto_ingest/*.txt
+auto_ingest/*.json
+!auto_ingest/.gitkeep
+uploads/*
+!uploads/.gitkeep
+
+# Editor & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Log Ingestion - SENTINEL CTI{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h3 class="fw-bold mb-1">Security Log Ingestion & Stream</h3>
+        <p class="text-secondary small mb-0">Upload local network, server, firewall, or EDR logs to correlate against active threat intelligence.</p>
+    </div>
+</div>
+
+<!-- Ingestion Actions Row -->
+<div class="row g-3 mb-4">
+    <!-- 1-Click Demo Run -->
+    <div class="col-12 col-lg-5">
+        <div class="card card-soc h-100" style="border-left: 3px solid var(--accent-cyan);">
+            <div class="card-soc-header">
+                <span class="fw-semibold text-white">
+                    <i class="bi bi-play-circle text-info"></i> Instant Demo Simulation
+                </span>
+                <span class="badge bg-info text-dark font-mono">1-CLICK</span>
+            </div>
+            <div class="p-3 d-flex flex-column justify-content-between h-100">
+                <p class="text-secondary small mb-3">
+                    Run the pre-configured sample log (<span class="font-mono text-white">demo_security.log</span>) containing a mix of benign traffic and 8 simulated cyberattacks (C2 beacons, malware payloads, and phishing queries).
+                </p>
+                <form action="/logs/run-demo" method="POST">
+                    <button type="submit" class="btn btn-info text-dark fw-bold w-100 d-flex align-items-center justify-content-center gap-2">
+                        <i class="bi bi-lightning-charge-fill"></i>
+                        <span>Run Demo Log & View Alerts</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Custom Log File -->
+    <div class="col-12 col-lg-7">
+        <div class="card card-soc h-100" style="border-left: 3px solid var(--accent-blue);">
+            <div class="card-soc-header">
+                <span class="fw-semibold text-white">
+                    <i class="bi bi-upload text-primary"></i> Upload Custom Log File
+                </span>
+                <span class="badge bg-secondary font-mono">Syslog / JSON / Text</span>
+            </div>
+            <div class="p-3">
+                <form action="/logs/upload" method="POST" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label class="form-label small text-secondary">Select file (.log, .txt, .json, or .csv):</label>
+                        <input class="form-control form-control-sm bg-dark text-white border-secondary font-mono" type="file" id="file" name="file" required>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="text-muted" style="font-size: 0.75rem;">
+                            <i class="bi bi-folder2-open"></i> Or drop directly into <code class="text-info">auto_ingest/</code>
+                        </small>
+                        <button type="submit" class="btn btn-sm btn-primary d-flex align-items-center gap-2">
+                            <i class="bi bi-arrow-repeat"></i>
+                            <span>Upload & Correlate</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- History Table -->
+<div class="card card-soc">
+    <div class="card-soc-header">
+        <span class="fw-semibold text-white">Ingestion History</span>
+        <span class="badge bg-secondary font-mono">{{ logs|length }} Files Tracked</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-soc align-middle mb-0">
+            <thead>
+                <tr>
+                    <th style="width: 60px;">ID</th>
+                    <th>Filename</th>
+                    <th>Source Type</th>
+                    <th>Lines Processed</th>
+                    <th>Status</th>
+                    <th>Uploaded At</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr>
+                    <td class="font-mono text-muted">#{{ log.id }}</td>
+                    <td class="font-mono fw-semibold text-white">{{ log.filename }}</td>
+                    <td><span class="badge bg-dark border border-secondary text-info font-mono">{{ log.type|upper }}</span></td>
+                    <td class="font-mono">{{ log.line_count }} lines</td>
+                    <td>
+                        <span class="badge {% if log.status == 'done' %}bg-success{% elif log.status == 'processing' %}bg-warning text-dark{% else %}bg-danger{% endif %} text-uppercase font-mono" style="font-size: 0.7rem;">
+                            {{ log.status }}
+                        </span>
+                    </td>
+                    <td class="small text-muted font-mono">{{ log.uploaded_at.strftime('%Y-%m-%d %H:%M:%S UTC') if log.uploaded_at else 'N/A' }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center py-4 text-muted">
+                        No logs ingested yet. Use the actions above to upload a log file.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

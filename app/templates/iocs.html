@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}IOCs - Threat Intel Platform{% endblock %}
+{% block content %}
+<h2>Indicators of Compromise</h2>
+<table class="table table-striped">
+    <thead>
+        <tr><th>ID</th><th>Type</th><th>Value</th><th>Confidence</th><th>Severity</th></tr>
+    </thead>
+    <tbody>
+        {% for ioc in iocs %}
+        <tr>
+            <td>{{ ioc.id }}</td>
+            <td><span class="badge bg-secondary">{{ ioc.type }}</span></td>
+            <td>{{ ioc.value }}</td>
+            <td>{{ ioc.confidence }}</td>
+            <td><span class="badge severity-{{ ioc.severity }}">{{ ioc.severity }}</span></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

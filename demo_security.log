@@ -1,0 +1,14 @@
+2026-09-30 10:00:00    INFO  ACCEPT TCP 192.168.1.105:49152 -> 8.8.8.8:53 [DNS Query: google.com]
+2026-09-30 10:01:31   INFO  GET /index.html HTTP/1.1 200 Host: company-portal.local User-Agent: Mozilla/5.0
+2026-09-30 10:03:00  INFO  ACCEPT TCP 192.168.1.120:55432 -> 1.1.1.1:53 [DNS Query: microsoft.com]
+2026-09-30 10:06:00  INFO  POST /api/login HTTP/1.1 200 Host: auth.company.internal user=alice
+2026-09-30 10:08:22  ALERT OUTBOUND TCP 192.168.1.50:52311 -> 185.220.101.5:443 [Suspicious C2 Connection]
+2026-09-30 10:12:45  WARN  GET /payload.exe HTTP/1.1 200 Host: evil-malware-download.xyz URL: http://evil-malware-download.xyz/payload.exe
+2026-09-30 10:15:20  WARN  DNS QUERY login.phishing-bank-login.top FROM 192.168.1.77
+2026-09-30 10:17:12 WARN  FILE_SCAN Executable downloaded hash=44d88612fea8a8f36de82e1278abb02f by user: jdoe at 192.168.1.50
+2026-09-30 10:19:00 ALERT FILE_EXEC process=svchost.exe sha256=275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f
+2026-09-30 10:21:40 WARN  EMAIL_RECEIVED from=attacker@phishing-bank-login.top to=ceo@corp.com subject='Urgent: Account Verification'
+2026-09-30 10:24:10 ALERT OUTBOUND UDP 192.168.1.88:5353 -> 194.26.29.112:53 [Botnet C2 Beacon]
+2026-09-30 10:26:00 ALERT TCP 10.0.0.15 -> 91.92.251.103:8808 [AsyncRAT C2 detected by EDR]
+2026-09-30 10:30:00 INFO  ACCEPT TCP 192.168.1.200:60001 -> 142.250.182.14:443 [HTTPS: gmail.com]
+2026-09-30 10:35:00 INFO  GET /api/status HTTP/1.1 200 Host: company-portal.local

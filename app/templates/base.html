@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}SENTINEL // Cyber Threat Intelligence Console{% endblock %}</title>
+    
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Bootstrap 5 CSS & Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    
+    <style>
+        :root {
+            --bg-canvas: #0B0F19;
+            --bg-surface: #111827;
+            --bg-surface-elevated: #1F2937;
+            --border-subtle: #242E42;
+            --border-active: #3B82F6;
+            --text-primary: #F9FAFB;
+            --text-secondary: #9CA3AF;
+            --text-muted: #64748B;
+            --accent-cyan: #06B6D4;
+            --accent-blue: #3B82F6;
+            --accent-green: #10B981;
+            --accent-amber: #F59E0B;
+            --accent-rose: #EF4444;
+            --accent-purple: #8B5CF6;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg-canvas);
+            color: var(--text-primary);
+            padding-top: 64px;
+            min-height: 100vh;
+            letter-spacing: -0.01em;
+        }
+
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Top Navbar */
+        .soc-navbar {
+            height: 64px;
+            background: rgba(17, 24, 39, 0.95);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-subtle);
+            z-index: 1030;
+        }
+
+        .brand-logo {
+            font-weight: 700;
+            font-size: 1.05rem;
+            letter-spacing: 0.05em;
+            color: var(--text-primary);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .brand-badge {
+            background: linear-gradient(135deg, #1E40AF, #06B6D4);
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            color: #fff;
+            text-transform: uppercase;
+        }
+
+        .status-pulse-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--accent-green);
+            box-shadow: 0 0 10px var(--accent-green);
+            display: inline-block;
+            animation: pulse-ring 2s infinite ease-in-out;
+        }
+
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.2); opacity: 1; filter: drop-shadow(0 0 4px var(--accent-green)); }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+
+        /* Sidebar */
+        .soc-sidebar {
+            position: fixed;
+            top: 64px;
+            bottom: 0;
+            left: 0;
+            width: 260px;
+            background: var(--bg-surface);
+            border-right: 1px solid var(--border-subtle);
+            padding: 1.25rem 0.75rem;
+            overflow-y: auto;
+            z-index: 1020;
+        }
+
+        .sidebar-section-title {
+            font-size: 0.68rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: var(--text-muted);
+            padding: 0.75rem 0.75rem 0.25rem;
+            margin-top: 0.5rem;
+        }
+
+        .soc-nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 0.6rem 0.85rem;
+            color: var(--text-secondary);
+            border-radius: 8px;
+            font-size: 0.88rem;
+            font-weight: 500;
+            text-decoration: none;
+            transition: all 0.15s ease-in-out;
+            margin-bottom: 2px;
+        }
+
+        .soc-nav-item i {
+            font-size: 1.1rem;
+            width: 20px;
+            text-align: center;
+            color: var(--text-muted);
+            transition: color 0.15s;
+        }
+
+        .soc-nav-item:hover {
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .soc-nav-item:hover i {
+            color: var(--accent-cyan);
+        }
+
+        .soc-nav-item.active {
+            color: #fff;
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.2), rgba(6, 182, 212, 0.08));
+            border-left: 3px solid var(--accent-cyan);
+            font-weight: 600;
+        }
+
+        .soc-nav-item.active i {
+            color: var(--accent-cyan);
+        }
+
+        /* Main Content */
+        .soc-main {
+            margin-left: 260px;
+            padding: 2rem 2.5rem;
+            min-height: calc(100vh - 64px);
+        }
+
+        /* Custom Cards & Panels */
+        .card-soc {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .card-soc:hover {
+            border-color: rgba(59, 130, 246, 0.35);
+        }
+
+        .card-soc-header {
+            background: transparent;
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 1rem 1.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* Telemetry Metric Cards */
+        .metric-card {
+            background: linear-gradient(180deg, rgba(31, 41, 55, 0.5) 0%, rgba(17, 24, 39, 0.9) 100%);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 1.25rem;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(59, 130, 246, 0.4);
+        }
+
+        .metric-card::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--card-accent, var(--accent-blue));
+            opacity: 0.9;
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+            line-height: 1.2;
+            letter-spacing: -0.02em;
+            color: var(--text-primary);
+        }
+
+        .metric-label {
+            font-size: 0.78rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        /* Severity Tags */
+        .badge-severity-critical, .severity-critical {
+            background: rgba(239, 68, 68, 0.2);
+            color: #F87171;
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .badge-severity-high, .severity-high {
+            background: rgba(245, 158, 11, 0.2);
+            color: #FBBF24;
+            border: 1px solid rgba(245, 158, 11, 0.4);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .badge-severity-medium, .severity-medium {
+            background: rgba(59, 130, 246, 0.2);
+            color: #60A5FA;
+            border: 1px solid rgba(59, 130, 246, 0.4);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .badge-severity-low, .severity-low {
+            background: rgba(100, 116, 139, 0.2);
+            color: #94A3B8;
+            border: 1px solid rgba(100, 116, 139, 0.4);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* Tables */
+        .table-soc {
+            --bs-table-bg: transparent;
+            --bs-table-color: var(--text-primary);
+            --bs-table-border-color: var(--border-subtle);
+        }
+
+        .table-soc th {
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            padding: 0.85rem 1rem;
+            background: rgba(31, 41, 55, 0.4);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .table-soc td {
+            font-size: 0.85rem;
+            padding: 0.85rem 1rem;
+            vertical-align: middle;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .table-soc tbody tr:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        /* User Profile Pill */
+        .user-pill {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-subtle);
+            border-radius: 9999px;
+            padding: 4px 12px 4px 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.82rem;
+        }
+
+        .user-avatar {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #3B82F6, #06B6D4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.75rem;
+            color: #fff;
+        }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body>
+
+    <!-- Professional SOC Top Navbar -->
+    <nav class="navbar navbar-expand-lg fixed-top soc-navbar px-3">
+        <div class="container-fluid px-0">
+            <!-- Brand -->
+            <a class="brand-logo" href="/">
+                <i class="bi bi-shield-shaded text-info fs-4"></i>
+                <div class="d-flex flex-column">
+                    <span class="d-flex align-items-center gap-2">
+                        <strong style="letter-spacing: 0.02em;">SENTINEL</strong>
+                        <span class="brand-badge">CTI ENGINE</span>
+                    </span>
+                    <small style="font-size: 0.65rem; color: var(--text-muted); letter-spacing: 0.05em; font-family: monospace;">IOC CORRELATION PLATFORM</small>
+                </div>
+            </a>
+
+            <!-- Telemetry Indicator & Clock -->
+            <div class="d-none d-md-flex align-items-center gap-3 ms-4 ps-3 border-start border-secondary" style="border-color: var(--border-subtle) !important;">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="status-pulse-dot"></span>
+                    <span class="text-secondary small fw-medium" style="font-size: 0.75rem; letter-spacing: 0.05em;">TELEMETRY LIVE</span>
+                </div>
+                <div class="font-mono text-muted small" id="live-utc-clock" style="font-size: 0.75rem;">
+                    --:--:-- UTC
+                </div>
+            </div>
+
+            <!-- Global Search & User Profile -->
+            <div class="ms-auto d-flex align-items-center gap-3">
+                <form action="/lookup" method="POST" class="d-none d-lg-block" style="width: 280px;">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-dark border-secondary border-end-0 text-muted" style="border-color: var(--border-subtle) !important;">
+                            <i class="bi bi-search"></i>
+                        </span>
+                        <input type="text" name="query" class="form-control bg-dark border-secondary border-start-0 text-white font-mono" placeholder="Quick IOC lookup..." style="border-color: var(--border-subtle) !important; font-size: 0.8rem;">
+                    </div>
+                </form>
+
+                <!-- Profile -->
+                <div class="user-pill">
+                    <div class="user-avatar">
+                        {{ request.session.get('user', 'A')[0]|upper }}
+                    </div>
+                    <div class="d-flex flex-column" style="line-height: 1.1;">
+                        <span class="fw-semibold text-white" style="font-size: 0.8rem;">{{ request.session.get('user', 'Analyst') }}</span>
+                        <small style="font-size: 0.65rem; color: var(--accent-cyan);">SOC ANALYST</small>
+                    </div>
+                    <a href="/logout" class="text-secondary ms-2 ps-2 border-start border-secondary text-decoration-none" title="Logout" style="border-color: var(--border-subtle) !important;">
+                        <i class="bi bi-box-arrow-right"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Professional Left Sidebar -->
+    <nav class="soc-sidebar">
+        <div class="sidebar-section-title">Operational Monitoring</div>
+        <a class="soc-nav-item {% if request.url.path == '/' %}active{% endif %}" href="/">
+            <i class="bi bi-grid-1x2"></i>
+            <span>Overview Console</span>
+        </a>
+        <a class="soc-nav-item {% if request.url.path == '/alerts' %}active{% endif %}" href="/alerts">
+            <i class="bi bi-exclamation-octagon"></i>
+            <span>Security Alerts</span>
+        </a>
+
+        <div class="sidebar-section-title">Threat Intelligence</div>
+        <a class="soc-nav-item {% if request.url.path == '/iocs' %}active{% endif %}" href="/iocs">
+            <i class="bi bi-database-check"></i>
+            <span>Indicator Repository</span>
+        </a>
+        <a class="soc-nav-item {% if request.url.path == '/feeds' %}active{% endif %}" href="/feeds">
+            <i class="bi bi-broadcast-pin"></i>
+            <span>Threat Feed Hub</span>
+        </a>
+        <a class="soc-nav-item {% if request.url.path == '/settings' %}active{% endif %}" href="/settings">
+            <i class="bi bi-shield-check"></i>
+            <span>Whitelist Policies</span>
+        </a>
+
+        <div class="sidebar-section-title">Ingestion & Analysis</div>
+        <a class="soc-nav-item {% if request.url.path == '/logs' %}active{% endif %}" href="/logs">
+            <i class="bi bi-file-earmark-arrow-up"></i>
+            <span>Security Log Ingestion</span>
+        </a>
+        <a class="soc-nav-item {% if request.url.path == '/lookup' %}active{% endif %}" href="/lookup">
+            <i class="bi bi-crosshair"></i>
+            <span>Artifact Deep Lookup</span>
+        </a>
+
+        <div class="sidebar-section-title">System & Governance</div>
+        <a class="soc-nav-item {% if request.url.path == '/register' %}active{% endif %}" href="/register">
+            <i class="bi bi-person-plus"></i>
+            <span>Analyst Registration</span>
+        </a>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="soc-main">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Bootstrap 5 JS & Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <script>
+        // Live UTC clock updater
+        function updateUTCClock() {
+            const now = new Date();
+            const utcString = now.toUTCString().split(' ')[4] + ' UTC';
+            const el = document.getElementById('live-utc-clock');
+            if (el) el.textContent = utcString;
+        }
+        setInterval(updateUTCClock, 1000);
+        updateUTCClock();
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

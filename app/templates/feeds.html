@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Feeds - Threat Intel Platform{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h2>Threat Intel Feeds</h2>
+    <form action="/feeds/run_all" method="post">
+        <button type="submit" class="btn btn-primary">Fetch Now</button>
+    </form>
+</div>
+
+<h4>Configured Feeds</h4>
+<table class="table table-striped">
+    <thead>
+        <tr><th>Name</th><th>Type</th><th>Enabled</th><th>Last Run Status</th><th>Last Run At</th></tr>
+    </thead>
+    <tbody>
+        {% for feed in feeds %}
+        <tr>
+            <td>{{ feed.name }}</td>
+            <td>{{ feed.type }}</td>
+            <td>{{ feed.enabled }}</td>
+            <td>{{ feed.last_run_status }}</td>
+            <td>{{ feed.last_run_at }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h4 class="mt-4">Recent Runs</h4>
+<table class="table table-sm">
+    <thead>
+        <tr><th>Feed ID</th><th>Status</th><th>Start Time</th><th>End Time</th><th>Records Fetched</th><th>New</th></tr>
+    </thead>
+    <tbody>
+        {% for run in runs %}
+        <tr>
+            <td>{{ run.feed_id }}</td>
+            <td>{{ run.status }}</td>
+            <td>{{ run.start_time }}</td>
+            <td>{{ run.end_time }}</td>
+            <td>{{ run.records_fetched }}</td>
+            <td>{{ run.new_records }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
