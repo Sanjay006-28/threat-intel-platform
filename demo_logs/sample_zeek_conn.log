@@ -1,0 +1,11 @@
+#separator \x09
+#set_separator	,
+#empty_field	(empty)
+#unset_field	-
+#path	conn
+#fields	ts	uid	id.orig_h	id.orig_p	id.resp_h	id.resp_p	proto	service	duration	orig_bytes	resp_bytes	conn_state	local_orig	local_resp	missed_bytes	history	orig_pkts	orig_ip_bytes	resp_pkts	resp_ip_bytes	tunnel_parents
+1792900000.123456	C1abcD2efg3hiJ4kl5	192.168.1.15	51234	1.1.1.1	53	udp	dns	0.012	64	128	SF	T	F	0	Dd	1	92	1	156	-
+1792900200.654321	C2xyzA3bcd4efG5hi6	192.168.1.50	52311	185.220.101.5	443	tcp	ssl	12.450	1048	4096	SF	T	F	0	ShADadFf	14	1820	18	5120	-
+1792900400.789123	C3qweR4tyu5ioP6as7	192.168.1.50	52419	91.92.251.103	8808	tcp	ssl	45.120	4520	18200	SF	T	F	0	ShADadFf	42	6720	58	21400	-
+#close	2026-10-30-10-30-00
+

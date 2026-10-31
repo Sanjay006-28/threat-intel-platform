@@ -386,13 +386,17 @@
             <i class="bi bi-grid-1x2"></i>
             <span>Overview Console</span>
         </a>
-        <a class="soc-nav-item {% if request.url.path == '/alerts' %}active{% endif %}" href="/alerts">
+        <a class="soc-nav-item {% if request.url.path == '/alerts' or request.url.path.startswith('/alerts/') %}active{% endif %}" href="/alerts">
             <i class="bi bi-exclamation-octagon"></i>
             <span>Security Alerts</span>
         </a>
+        <a class="soc-nav-item {% if request.url.path == '/incidents' or request.url.path.startswith('/incidents/') %}active{% endif %}" href="/incidents">
+            <i class="bi bi-folder-check"></i>
+            <span>Incident Cases</span>
+        </a>
 
         <div class="sidebar-section-title">Threat Intelligence</div>
-        <a class="soc-nav-item {% if request.url.path == '/iocs' %}active{% endif %}" href="/iocs">
+        <a class="soc-nav-item {% if request.url.path == '/iocs' or request.url.path.startswith('/iocs/') %}active{% endif %}" href="/iocs">
             <i class="bi bi-database-check"></i>
             <span>Indicator Repository</span>
         </a>
@@ -416,6 +420,10 @@
         </a>
 
         <div class="sidebar-section-title">System & Governance</div>
+        <a class="soc-nav-item {% if request.url.path == '/audit-logs' %}active{% endif %}" href="/audit-logs">
+            <i class="bi bi-journal-text"></i>
+            <span>SOC Audit Trails</span>
+        </a>
         <a class="soc-nav-item {% if request.url.path == '/register' %}active{% endif %}" href="/register">
             <i class="bi bi-person-plus"></i>
             <span>Analyst Registration</span>

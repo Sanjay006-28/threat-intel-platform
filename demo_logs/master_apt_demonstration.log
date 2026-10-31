@@ -1,0 +1,27 @@
+# SENTINEL DEMONSTRATION SCENARIO: Multi-Stage APT Intrusion Campaign
+# Host: WS-FINANCE-04 (192.168.1.50) | Analyst Triage Walkthrough
+# ---------------------------------------------------------------------------------------------------
+# Baseline Benign Activity
+2026-10-30 10:00:15 INFO WORKSTATION-01 systemd: Started Daily apt download activities.
+2026-10-30 10:01:00 INFO WORKSTATION-01 sshd[1284]: Accepted publickey for analyst from 192.168.1.15 port 49120 ssh2
+2026-10-30 10:05:22 INFO DNS-SRV01 named[1042]: client @0x7f10 192.168.1.50#51120 (corp.internal.local): query: corp.internal.local IN A + (192.168.1.1)
+
+# STAGE 1: Initial Access - Spearphishing & Credential Harvester DNS Query
+2026-10-30 10:08:10 WARN MAIL-GATEWAY postfix/cleanup[4921]: EMAIL_RECEIVED from=attacker@phishing-bank-login.top to=finance.lead@corp.com subject='URGENT: Corporate Wire Authorization Required' message-id=<20261030.9942@phishing-bank-login.top>
+2026-10-30 10:09:45 WARN DNS-SRV01 named[1042]: client @0x7f10 192.168.1.50#58992 (login.phishing-bank-login.top): query: login.phishing-bank-login.top IN A + (192.168.1.1)
+
+# STAGE 2: Execution & Payload Delivery - Ingress HTTP Download
+2026-10-30 10:12:45 WARN PROXY-EDGE squid[8812]: TCP_MISS/200 49152 GET http://evil-malware-download.xyz/payload.exe finance_user DIRECT/evil-malware-download.xyz application/octet-stream
+
+# STAGE 3: Persistence & Defense Evasion - File Execution & Hashes
+2026-10-30 10:17:12 ALERT EDR-AGENT host=WS-FINANCE-04 user=jdoe process=payload.exe action=FILE_SCAN status=INFECTED md5=44d88612fea8a8f36de82e1278abb02f sha256=275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f path='C:\Users\jdoe\AppData\Local\Temp\payload.exe'
+2026-10-30 10:17:15 ALERT WIN-SECURITY host=WS-FINANCE-04 EventID=4688 NewProcessName='C:\Windows\System32\svchost.exe' ProcessCommandLine='svchost.exe -k netsvcs' ParentProcess='payload.exe'
+
+# STAGE 4: Command and Control (C2) - Beaconing to IP & Subnet Block
+2026-10-30 10:19:00 ALERT FW-CORE kernel: OUTBOUND TCP SRC=192.168.1.50:52311 DST=185.220.101.5:443 [Suspicious C2 Node Beacon]
+2026-10-30 10:24:10 ALERT FW-CORE kernel: OUTBOUND UDP SRC=192.168.1.50:5353 DST=194.26.29.112:53 [Subnet Range C2 Beaconing]
+
+# STAGE 5: Exfiltration Channel - AsyncRAT Active Session
+2026-10-30 10:26:00 CRITICAL NIDS-ZEEK conn_id=C4a1b2c3d4e5 SRC=192.168.1.50:52419 DST=91.92.251.103:8808 PROTO=TCP [AsyncRAT Remote Access Trojan Active Session Detected]
+2026-10-30 10:28:00 INFO WORKSTATION-01 systemd: Routine cron job completed for user root.
+

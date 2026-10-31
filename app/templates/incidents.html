@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}SENTINEL // Incident Management{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h3 class="fw-bold mb-1"><i class="bi bi-folder-check text-warning me-2"></i>Incident Cases</h3>
+        <p class="text-secondary small mb-0">Track and coordinate multi-alert security investigations and containment actions.</p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <span class="badge bg-warning-subtle text-warning border border-warning px-3 py-2">
+            <i class="bi bi-radioactive me-1"></i> {{ open_count }} Active Cases
+        </span>
+        <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#createIncidentModal">
+            <i class="bi bi-plus-circle me-1"></i> Create Incident
+        </button>
+    </div>
+</div>
+
+<div class="card card-soc">
+    <div class="card-soc-header">
+        <span class="fw-semibold small text-uppercase" style="letter-spacing: 0.05em;">Incident Response Ledger</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-soc mb-0">
+            <thead>
+                <tr>
+                    <th style="width: 80px;">ID</th>
+                    <th>Incident Title</th>
+                    <th>Severity</th>
+                    <th>Status</th>
+                    <th>Linked Alerts</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for inc in incidents %}
+                <tr>
+                    <td class="font-mono text-muted">#{{ inc.id }}</td>
+                    <td>
+                        <a href="/incidents/{{ inc.id }}" class="text-decoration-none fw-semibold text-white">
+                            {{ inc.title }}
+                        </a>
+                        {% if inc.description %}
+                        <div class="text-muted small text-truncate" style="max-width: 380px;">{{ inc.description }}</div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge badge-severity-{{ inc.severity }}">{{ inc.severity }}</span>
+                    </td>
+                    <td>
+                        <span class="badge {% if inc.status in ['open', 'investigating'] %}bg-danger{% elif inc.status == 'contained' %}bg-warning text-dark{% else %}bg-success{% endif %}">
+                            {{ inc.status|upper }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge bg-dark border border-secondary font-mono">{{ inc.alerts|length }} Alerts</span>
+                    </td>
+                    <td class="font-mono text-muted small">
+                        {{ inc.created_at.strftime('%Y-%m-%d %H:%M') if inc.created_at else '--' }}
+                    </td>
+                    <td>
+                        <a href="/incidents/{{ inc.id }}" class="btn btn-xs btn-outline-info">
+                            <i class="bi bi-eye"></i> Investigate
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center py-4 text-muted">
+                        <i class="bi bi-check-circle fs-3 d-block mb-2 text-success"></i>
+                        No incident cases registered yet. Incidents can be opened manually or grouped from security alerts.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal: Create Incident -->
+<div class="modal fade" id="createIncidentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark border border-secondary text-white">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title fs-6"><i class="bi bi-folder-plus text-warning me-2"></i>Create New Security Incident</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="/incidents/create" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label small text-secondary">Incident Title</label>
+                        <input type="text" name="title" class="form-control bg-dark border-secondary text-white" placeholder="e.g. Outbound C2 Beaconing to Emotet Node" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small text-secondary">Initial Severity</label>
+                        <select name="severity" class="form-select bg-dark border-secondary text-white">
+                            <option value="medium">Medium</option>
+                            <option value="high">High</option>
+                            <option value="critical">Critical</option>
+                            <option value="low">Low</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small text-secondary">Incident Overview & Hypothesis</label>
+                        <textarea name="description" rows="3" class="form-control bg-dark border-secondary text-white" placeholder="Brief explanation of the incident scope and affected internal endpoints..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-sm btn-primary">Open Incident Case</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

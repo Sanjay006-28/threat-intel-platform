@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block title %}SENTINEL // IOC #{{ ioc.id }} - {{ ioc.value }}{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <a href="/iocs" class="btn btn-sm btn-outline-secondary mb-3">
+        <i class="bi bi-arrow-left me-1"></i> Back to Repository
+    </a>
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge bg-secondary font-mono">IOC #{{ ioc.id }}</span>
+                <span class="badge bg-info font-mono">{{ ioc.type|upper }}</span>
+                <span class="badge badge-severity-{{ ioc.severity }}">{{ ioc.severity|upper }}</span>
+                <span class="badge {% if ioc.is_active %}bg-success{% else %}bg-danger{% endif %} font-mono">
+                    {% if ioc.is_active %}ACTIVE THREAT{% else %}DEACTIVATED / EXPIRED{% endif %}
+                </span>
+            </div>
+            <h3 class="fw-bold font-mono text-white mb-0 text-break">{{ ioc.value }}</h3>
+        </div>
+        <form action="/iocs/{{ ioc.id }}/toggle" method="POST">
+            {% if ioc.is_active %}
+            <button class="btn btn-sm btn-outline-danger">
+                <i class="bi bi-pause-circle me-1"></i> Deactivate Indicator
+            </button>
+            {% else %}
+            <button class="btn btn-sm btn-outline-success">
+                <i class="bi bi-play-circle me-1"></i> Reactivate Indicator
+            </button>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card card-soc mb-4">
+            <div class="card-soc-header">
+                <span class="fw-semibold small text-uppercase">Telemetry & Attribution Details</span>
+            </div>
+            <div class="card-body">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4">
+                        <div class="p-3 bg-dark rounded border border-secondary">
+                            <span class="text-muted small d-block">Confidence Score</span>
+                            <span class="fs-4 fw-bold font-mono text-info">{{ ioc.confidence }} / 100</span>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3 bg-dark rounded border border-secondary">
+                            <span class="text-muted small d-block">First Reported</span>
+                            <span class="font-mono text-white small">{{ ioc.first_seen.strftime('%Y-%m-%d %H:%M') if ioc.first_seen else '--' }}</span>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3 bg-dark rounded border border-secondary">
+                            <span class="text-muted small d-block">Expires / TTL</span>
+                            <span class="font-mono text-white small">{{ ioc.expires_at.strftime('%Y-%m-%d %H:%M') if ioc.expires_at else 'No TTL set' }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small text-secondary">Indicator Description</label>
+                    <p class="text-white p-2 bg-dark rounded border border-secondary font-mono small mb-0">{{ ioc.description or "No description provided." }}</p>
+                </div>
+
+                <div class="mb-0">
+                    <label class="form-label small text-secondary">Threat Taxonomy Tags</label>
+                    <div>
+                        {% for tag in ioc.tags %}
+                        <span class="badge bg-dark border border-secondary font-mono me-1">{{ tag }}</span>
+                        {% else %}
+                        <span class="text-muted small">No taxonomy tags assigned.</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Associated Alerts -->
+        <div class="card card-soc">
+            <div class="card-soc-header">
+                <span class="fw-semibold small text-uppercase">Correlated Internal Alerts ({{ ioc.alerts|length }})</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-soc mb-0">
+                    <thead>
+                        <tr>
+                            <th>Alert</th>
+                            <th>Severity</th>
+                            <th>Hits</th>
+                            <th>Status</th>
+                            <th>Last Seen</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for a in ioc.alerts %}
+                        <tr>
+                            <td class="font-mono text-muted">#{{ a.id }}</td>
+                            <td><span class="badge badge-severity-{{ a.severity }}">{{ a.severity }}</span></td>
+                            <td class="font-mono">{{ a.hit_count or 1 }}x</td>
+                            <td><span class="badge bg-secondary">{{ a.status }}</span></td>
+                            <td class="font-mono small text-muted">{{ a.last_seen.strftime('%Y-%m-%d %H:%M') if a.last_seen else '--' }}</td>
+                            <td>
+                                <a href="/alerts/{{ a.id }}" class="btn btn-xs btn-outline-info">Inspect</a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center py-4 text-muted">
+                                No internal log events have matched this threat indicator yet.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column: Source Feeds -->
+    <div class="col-lg-4">
+        <div class="card card-soc">
+            <div class="card-soc-header">
+                <span class="fw-semibold small text-uppercase">Corroborating Feeds</span>
+            </div>
+            <div class="card-body">
+                {% for src in ioc.sources %}
+                <div class="p-3 bg-dark rounded border border-secondary mb-2">
+                    <strong class="text-info d-block">{{ src.feed_name }}</strong>
+                    <div class="text-muted small font-mono">Last Synchronized: {{ src.seen_at.strftime('%Y-%m-%d %H:%M') if src.seen_at else '--' }}</div>
+                    {% if src.reference_url %}
+                    <div class="mt-1 small text-truncate">
+                        <span class="text-secondary">Ref:</span> <span class="font-mono text-muted">{{ src.reference_url }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+                {% else %}
+                <p class="text-muted small mb-0">No external feed sources registered.</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

@@ -1,21 +1,192 @@
 {% extends "base.html" %}
-{% block title %}IOCs - Threat Intel Platform{% endblock %}
+
+{% block title %}SENTINEL // Threat Indicator Repository{% endblock %}
+
 {% block content %}
-<h2>Indicators of Compromise</h2>
-<table class="table table-striped">
-    <thead>
-        <tr><th>ID</th><th>Type</th><th>Value</th><th>Confidence</th><th>Severity</th></tr>
-    </thead>
-    <tbody>
-        {% for ioc in iocs %}
-        <tr>
-            <td>{{ ioc.id }}</td>
-            <td><span class="badge bg-secondary">{{ ioc.type }}</span></td>
-            <td>{{ ioc.value }}</td>
-            <td>{{ ioc.confidence }}</td>
-            <td><span class="badge severity-{{ ioc.severity }}">{{ ioc.severity }}</span></td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
+    <div>
+        <h3 class="fw-bold mb-1"><i class="bi bi-database-check text-info me-2"></i>Indicator Repository</h3>
+        <p class="text-secondary small mb-0">Centralized database of active, normalized, and scored threat intelligence indicators.</p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <a href="/api/stix/export" class="btn btn-sm btn-outline-info">
+            <i class="bi bi-box-arrow-down me-1"></i> Export STIX 2.1
+        </a>
+        <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#createIocModal">
+            <i class="bi bi-plus-circle me-1"></i> Add Manual IOC
+        </button>
+    </div>
+</div>
+
+<!-- Filter & Search Toolbar -->
+<div class="card card-soc p-3 mb-4">
+    <form action="/iocs" method="GET" class="row g-2 align-items-center">
+        <div class="col-md-5">
+            <div class="input-group input-group-sm">
+                <span class="input-group-text bg-dark border-secondary text-muted"><i class="bi bi-search"></i></span>
+                <input type="text" name="q" value="{{ search_query }}" class="form-control bg-dark border-secondary text-white font-mono" placeholder="Search indicator value, CIDR, or description...">
+            </div>
+        </div>
+        <div class="col-md-3">
+            <select name="type" class="form-select form-select-sm bg-dark border-secondary text-white font-mono">
+                <option value="all" {% if selected_type == 'all' %}selected{% endif %}>All Indicator Types</option>
+                {% for t in available_types %}
+                <option value="{{ t }}" {% if selected_type == t %}selected{% endif %}>{{ t|upper }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <select name="status" class="form-select form-select-sm bg-dark border-secondary text-white font-mono">
+                <option value="all" {% if selected_status == 'all' %}selected{% endif %}>All Statuses</option>
+                <option value="active" {% if selected_status == 'active' %}selected{% endif %}>Active Threats</option>
+                <option value="inactive" {% if selected_status == 'inactive' %}selected{% endif %}>Deactivated / Expired</option>
+            </select>
+        </div>
+        <div class="col-md-2 d-flex gap-2">
+            <button type="submit" class="btn btn-sm btn-primary w-100">Filter</button>
+            <a href="/iocs" class="btn btn-sm btn-outline-secondary" title="Reset Filters"><i class="bi bi-arrow-clockwise"></i></a>
+        </div>
+    </form>
+</div>
+
+<!-- Total Stats & Pagination Banner -->
+<div class="d-flex align-items-center justify-content-between mb-2 px-1">
+    <span class="text-secondary small">
+        Showing <strong>{{ iocs|length }}</strong> of <strong>{{ total_count }}</strong> indicators (Page {{ current_page }} of {{ total_pages }})
+    </span>
+    <!-- Pagination -->
+    {% if total_pages > 1 %}
+    <nav>
+        <ul class="pagination pagination-sm mb-0">
+            <li class="page-item {% if current_page <= 1 %}disabled{% endif %}">
+                <a class="page-link bg-dark border-secondary text-white" href="/iocs?page={{ current_page - 1 }}&q={{ search_query }}&type={{ selected_type }}&status={{ selected_status }}">Previous</a>
+            </li>
+            <li class="page-item disabled">
+                <span class="page-link bg-dark border-secondary text-info">{{ current_page }} / {{ total_pages }}</span>
+            </li>
+            <li class="page-item {% if current_page >= total_pages %}disabled{% endif %}">
+                <a class="page-link bg-dark border-secondary text-white" href="/iocs?page={{ current_page + 1 }}&q={{ search_query }}&type={{ selected_type }}&status={{ selected_status }}">Next</a>
+            </li>
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+
+<!-- IOC Table -->
+<div class="card card-soc mb-4">
+    <div class="table-responsive">
+        <table class="table table-soc mb-0">
+            <thead>
+                <tr>
+                    <th style="width: 70px;">ID</th>
+                    <th style="width: 90px;">Type</th>
+                    <th>Indicator Value</th>
+                    <th style="width: 100px;">Confidence</th>
+                    <th style="width: 100px;">Severity</th>
+                    <th style="width: 110px;">Status</th>
+                    <th>Attribution / Feeds</th>
+                    <th style="width: 90px;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ioc in iocs %}
+                <tr>
+                    <td class="font-mono text-muted">#{{ ioc.id }}</td>
+                    <td>
+                        <span class="badge bg-secondary font-mono">{{ ioc.type }}</span>
+                    </td>
+                    <td>
+                        <a href="/iocs/{{ ioc.id }}" class="text-decoration-none font-mono fw-semibold text-info text-break">
+                            {{ ioc.value }}
+                        </a>
+                        {% if ioc.description %}
+                        <div class="text-muted small text-truncate" style="max-width: 350px;">{{ ioc.description }}</div>
+                        {% endif %}
+                    </td>
+                    <td class="font-mono">
+                        <div class="progress bg-dark border border-secondary" style="height: 6px; width: 60px;">
+                            <div class="progress-bar bg-info" style="width: {{ ioc.confidence }}%;"></div>
+                        </div>
+                        <span class="small text-muted">{{ ioc.confidence }}%</span>
+                    </td>
+                    <td>
+                        <span class="badge badge-severity-{{ ioc.severity }}">{{ ioc.severity }}</span>
+                    </td>
+                    <td>
+                        <span class="badge {% if ioc.is_active %}bg-success{% else %}bg-danger{% endif %} font-mono">
+                            {% if ioc.is_active %}ACTIVE{% else %}DEACTIVATED{% endif %}
+                        </span>
+                    </td>
+                    <td>
+                        {% for src in ioc.sources[:2] %}
+                        <span class="badge bg-dark border border-secondary small">{{ src.feed_name }}</span>
+                        {% endfor %}
+                        {% if ioc.sources|length > 2 %}
+                        <span class="text-muted small">+{{ ioc.sources|length - 2 }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="/iocs/{{ ioc.id }}" class="btn btn-xs btn-outline-info">
+                            <i class="bi bi-eye"></i> View
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" class="text-center py-4 text-muted">
+                        No threat indicators found matching query criteria.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal: Create Manual IOC -->
+<div class="modal fade" id="createIocModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark border border-secondary text-white">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title fs-6"><i class="bi bi-plus-circle text-info me-2"></i>Add Threat Indicator Manually</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="/iocs/create" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label small text-secondary">Indicator Value (IP, CIDR, Domain, URL, Hash, Email)</label>
+                        <input type="text" name="value" class="form-control bg-dark border-secondary text-white font-mono" placeholder="e.g. 194.26.29.0/24 or badsite.com" required>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label small text-secondary">Confidence (0-100)</label>
+                            <input type="number" name="confidence" value="85" min="1" max="100" class="form-control bg-dark border-secondary text-white font-mono">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small text-secondary">Severity</label>
+                            <select name="severity" class="form-select bg-dark border-secondary text-white font-mono">
+                                <option value="medium">Medium</option>
+                                <option value="high" selected>High</option>
+                                <option value="critical">Critical</option>
+                                <option value="low">Low</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small text-secondary">Taxonomy Tags (Comma-separated)</label>
+                        <input type="text" name="tags" class="form-control bg-dark border-secondary text-white font-mono" placeholder="c2, botnet, emotet">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small text-secondary">Description / Threat Context</label>
+                        <textarea name="description" rows="3" class="form-control bg-dark border-secondary text-white" placeholder="Analyst intel notes, malware family, campaign context..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-sm btn-primary">Save to Repository</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 {% endblock %}

@@ -1,0 +1,9 @@
+# DNS Server Query Audit Log Sample
+# Generated for SENTINEL Local SOC Demonstration
+2026-10-30 10:10:01 DNS-SRV01 named[1042]: client @0x7f10 192.168.1.15#52119 (google.com): query: google.com IN A + (192.168.1.1)
+2026-10-30 10:11:22 DNS-SRV01 named[1042]: client @0x7f10 192.168.1.22#54120 (github.com): query: github.com IN A + (192.168.1.1)
+2026-10-30 10:12:45 DNS-SRV01 named[1042]: client @0x7f10 192.168.1.50#58992 (evil-malware-download.xyz): query: evil-malware-download.xyz IN A + (192.168.1.1)
+2026-10-30 10:13:00 DNS-SRV01 named[1042]: client @0x7f10 192.168.1.50#58993 (payload-stage2.evil-malware-download.xyz): query: payload-stage2.evil-malware-download.xyz IN A + (192.168.1.1)
+2026-10-30 10:15:20 DNS-SRV01 named[1042]: client @0x7f10 192.168.1.77#59114 (login.phishing-bank-login.top): query: login.phishing-bank-login.top IN A + (192.168.1.1)
+2026-10-30 10:16:00 DNS-SRV01 named[1042]: client @0x7f10 192.168.1.100#50221 (corp.internal.local): query: corp.internal.local IN A + (192.168.1.1)
+

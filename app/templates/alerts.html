@@ -4,20 +4,23 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
-        <h3 class="fw-bold mb-1">Correlated Threat Alerts</h3>
-        <p class="text-secondary small mb-0">High-fidelity incidents identified by correlating live logs with active threat intelligence.</p>
+        <h3 class="fw-bold mb-1"><i class="bi bi-exclamation-octagon text-danger me-2"></i>Correlated Threat Alerts</h3>
+        <p class="text-secondary small mb-0">High-fidelity security detections aggregated by time-window to prevent alert flooding.</p>
     </div>
     <div class="d-flex gap-2">
+        <a href="/incidents" class="btn btn-sm btn-outline-warning">
+            <i class="bi bi-folder-check me-1"></i> View Incidents
+        </a>
         <a href="/logs" class="btn btn-sm btn-outline-info">
-            <i class="bi bi-file-earmark-arrow-up"></i> Ingest New Log
+            <i class="bi bi-file-earmark-arrow-up me-1"></i> Ingest New Log
         </a>
     </div>
 </div>
 
 <div class="card card-soc">
-    <div class="card-soc-header">
-        <span class="fw-semibold text-white">Active Detections ({{ enriched_alerts|length }})</span>
-        <span class="badge bg-secondary font-mono">Live Correlation Stream</span>
+    <div class="card-soc-header d-flex align-items-center justify-content-between">
+        <span class="fw-semibold text-white">Aggregated Detections ({{ enriched_alerts|length }})</span>
+        <span class="badge bg-dark border border-secondary font-mono text-muted">1-Hour Time Window Aggregation</span>
     </div>
     <div class="table-responsive">
         <table class="table table-soc align-middle mb-0">
@@ -25,10 +28,11 @@
                 <tr>
                     <th style="width: 60px;">ID</th>
                     <th>Threat Indicator</th>
-                    <th>Origin / Context</th>
+                    <th>Occurrences</th>
                     <th>MITRE ATT&CK</th>
-                    <th>Severity</th>
+                    <th>Severity & Score</th>
                     <th>Status</th>
+                    <th>Case Link</th>
                     <th class="text-end">Actions</th>
                 </tr>
             </thead>
@@ -36,30 +40,27 @@
                 {% for item in enriched_alerts %}
                 {% set alert = item.alert %}
                 {% set mitre = item.mitre %}
-                {% set enc = item.enrichment %}
                 <tr>
                     <td class="font-mono text-muted">#{{ alert.id }}</td>
                     <td>
                         <div class="d-flex flex-column">
-                            <span class="font-mono fw-bold text-white text-break" style="font-size: 0.88rem;">{{ alert.matched_value }}</span>
-                            <span class="badge bg-dark border border-secondary text-info text-uppercase font-mono mt-1 align-self-start" style="font-size: 0.65rem;">
-                                {{ alert.matched_type }}
-                            </span>
+                            <a href="/alerts/{{ alert.id }}" class="font-mono fw-bold text-info text-decoration-none text-break" style="font-size: 0.9rem;">
+                                {{ alert.matched_value }}
+                            </a>
+                            <div class="d-flex align-items-center gap-1 mt-1">
+                                <span class="badge bg-secondary text-uppercase font-mono" style="font-size: 0.65rem;">
+                                    {{ alert.matched_type }}
+                                </span>
+                                <span class="text-muted small font-mono" style="font-size: 0.72rem;">
+                                    Last: {{ alert.last_seen.strftime('%H:%M:%S') if alert.last_seen else '--' }}
+                                </span>
+                            </div>
                         </div>
                     </td>
                     <td>
-                        {% if enc and enc.is_enriched %}
-                        <div class="d-flex flex-column">
-                            <span class="text-white small fw-medium">
-                                <i class="bi bi-geo-alt text-danger"></i> {{ enc.country }} ({{ enc.country_code }})
-                            </span>
-                            <small class="text-muted text-truncate" style="max-width: 180px;" title="{{ enc.org }}">
-                                {{ enc.org or enc.isp }}
-                            </small>
-                        </div>
-                        {% else %}
-                        <span class="text-muted small">Local / Internal</span>
-                        {% endif %}
+                        <span class="badge bg-dark border border-secondary text-info font-mono fs-6 px-2 py-1">
+                            {{ alert.hit_count or 1 }}x
+                        </span>
                     </td>
                     <td>
                         {% if mitre %}
@@ -70,13 +71,14 @@
                             <span class="text-muted small" style="font-size: 0.72rem;">{{ mitre.tactic }}</span>
                         </div>
                         {% else %}
-                        <span class="text-muted small">Generic</span>
+                        <span class="text-muted small">Generic Intel</span>
                         {% endif %}
                     </td>
                     <td>
                         <span class="badge badge-severity-{{ alert.severity }} px-2 py-1">
-                            {{ alert.severity|upper }} ({{ alert.score }})
+                            {{ alert.severity|upper }}
                         </span>
+                        <span class="font-mono small text-muted ms-1">{{ alert.score }}/100</span>
                     </td>
                     <td>
                         <form action="/alerts/{{ alert.id }}/status" method="POST" class="d-inline">
@@ -88,20 +90,32 @@
                             </select>
                         </form>
                     </td>
+                    <td>
+                        {% if alert.incident_id %}
+                        <a href="/incidents/{{ alert.incident_id }}" class="badge bg-warning text-dark text-decoration-none font-mono">
+                            Case #{{ alert.incident_id }}
+                        </a>
+                        {% else %}
+                        <span class="text-muted small font-mono">Unassigned</span>
+                        {% endif %}
+                    </td>
                     <td class="text-end">
                         <div class="btn-group btn-group-sm">
+                            <a href="/alerts/{{ alert.id }}" class="btn btn-outline-info" title="Deep Investigation">
+                                <i class="bi bi-search"></i> Inspect
+                            </a>
                             <button type="button" class="btn btn-outline-warning" title="View Containment Rules" onclick="openRemediationModal('{{ alert.id }}', '{{ alert.matched_value }}', '{{ alert.matched_type }}')">
-                                <i class="bi bi-shield-slash"></i> Remediate
+                                <i class="bi bi-shield-slash"></i>
                             </button>
-                            <a href="/alerts/{{ alert.id }}/report" class="btn btn-outline-info" title="Download Full Incident Report">
-                                <i class="bi bi-file-earmark-text"></i> Report
+                            <a href="/alerts/{{ alert.id }}/report" target="_blank" class="btn btn-outline-secondary" title="Incident Report">
+                                <i class="bi bi-file-earmark-text"></i>
                             </a>
                         </div>
                     </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="7" class="text-center py-4 text-muted">
+                    <td colspan="8" class="text-center py-4 text-muted">
                         No alerts generated yet. Ingest a log file from the <a href="/logs" class="text-info">Log Ingestion</a> tab to start correlation.
                     </td>
                 </tr>
@@ -117,33 +131,50 @@
         <div class="modal-content bg-dark border-secondary text-white">
             <div class="modal-header border-secondary">
                 <h5 class="modal-title font-mono" id="remedTitle">
-                    <i class="bi bi-shield-slash text-warning"></i> Automated Containment Rules
+                    <i class="bi bi-shield-slash text-warning"></i> Containment & Remediation Advisory
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <p class="text-secondary small mb-3">Copy-paste ready remediation rules for firewalls, DNS sinks, and Intrusion Detection Systems.</p>
+                <div class="alert alert-warning py-2 small mb-3">
+                    <i class="bi bi-info-circle me-1"></i> <strong>Analyst Notice:</strong> These rules are generated for manual verification and deployment. SENTINEL does not apply firewall rules automatically.
+                </div>
                 
                 <div id="remedLoading" class="text-center py-3">
                     <div class="spinner-border text-info" role="status"></div>
                 </div>
 
                 <div id="remedContent" style="display: none;">
-                    <div class="mb-3" id="iptablesWrap">
-                        <label class="form-label small text-info fw-bold">Linux Firewall (iptables):</label>
-                        <pre class="bg-black p-2 rounded border border-secondary text-warning font-mono small" id="iptablesCode"></pre>
+                    <div class="mb-3" id="remedIptablesBox">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-secondary small fw-bold"><i class="bi bi-terminal me-1"></i>Linux iptables Drop Rule</span>
+                            <button class="btn btn-xs btn-outline-secondary copy-btn" onclick="copyText('remedIptables')">Copy</button>
+                        </div>
+                        <pre id="remedIptables" class="p-2 bg-dark rounded border border-secondary font-mono text-info small mb-0"></pre>
                     </div>
-                    <div class="mb-3" id="windowsWrap">
-                        <label class="form-label small text-info fw-bold">Windows Defender Firewall (PowerShell):</label>
-                        <pre class="bg-black p-2 rounded border border-secondary text-info font-mono small" id="windowsCode"></pre>
+
+                    <div class="mb-3" id="remedWinFwBox">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-secondary small fw-bold"><i class="bi bi-windows me-1"></i>Windows Defender Firewall (PowerShell)</span>
+                            <button class="btn btn-xs btn-outline-secondary copy-btn" onclick="copyText('remedWinFw')">Copy</button>
+                        </div>
+                        <pre id="remedWinFw" class="p-2 bg-dark rounded border border-secondary font-mono text-warning small mb-0"></pre>
                     </div>
-                    <div class="mb-3" id="dnsWrap">
-                        <label class="form-label small text-info fw-bold">DNS Sinkhole (Pi-hole / Hosts):</label>
-                        <pre class="bg-black p-2 rounded border border-secondary text-success font-mono small" id="dnsCode"></pre>
+
+                    <div class="mb-3" id="remedDnsBox">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-secondary small fw-bold"><i class="bi bi-hdd-network me-1"></i>DNS Sinkhole (/etc/hosts / Pi-hole)</span>
+                            <button class="btn btn-xs btn-outline-secondary copy-btn" onclick="copyText('remedDns')">Copy</button>
+                        </div>
+                        <pre id="remedDns" class="p-2 bg-dark rounded border border-secondary font-mono text-success small mb-0"></pre>
                     </div>
-                    <div class="mb-3" id="idsWrap">
-                        <label class="form-label small text-info fw-bold">Suricata / Snort Rule:</label>
-                        <pre class="bg-black p-2 rounded border border-secondary text-white font-mono small" id="idsCode"></pre>
+
+                    <div class="mb-3" id="remedSuricataBox">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-secondary small fw-bold"><i class="bi bi-shield-exclamation me-1"></i>Suricata / Snort Signature</span>
+                            <button class="btn btn-xs btn-outline-secondary copy-btn" onclick="copyText('remedSuricata')">Copy</button>
+                        </div>
+                        <pre id="remedSuricata" class="p-2 bg-dark rounded border border-secondary font-mono text-danger small mb-0"></pre>
                     </div>
                 </div>
             </div>
@@ -157,38 +188,46 @@
 
 {% block scripts %}
 <script>
-function openRemediationModal(alertId, val, typ) {
-    const modal = new bootstrap.Modal(document.getElementById('remediationModal'));
-    document.getElementById('remedTitle').innerHTML = `<i class="bi bi-shield-slash text-warning"></i> Containment: ${val}`;
+function openRemediationModal(alertId, iocValue, iocType) {
+    document.getElementById('remedTitle').innerHTML = `<i class="bi bi-shield-slash text-warning"></i> Containment: ${iocValue}`;
     document.getElementById('remedLoading').style.display = 'block';
     document.getElementById('remedContent').style.display = 'none';
+    
+    var modal = new bootstrap.Modal(document.getElementById('remediationModal'));
     modal.show();
 
     fetch(`/alerts/${alertId}/remediation`)
-        .then(res => res.json())
+        .then(response => response.json())
         .then(data => {
             document.getElementById('remedLoading').style.display = 'none';
             document.getElementById('remedContent').style.display = 'block';
 
-            function setField(wrapId, codeId, val) {
-                const wrap = document.getElementById(wrapId);
-                const code = document.getElementById(codeId);
+            function setField(boxId, textId, val) {
+                var box = document.getElementById(boxId);
+                var textEl = document.getElementById(textId);
                 if (val) {
-                    wrap.style.display = 'block';
-                    code.textContent = val;
+                    textEl.textContent = val;
+                    box.style.display = 'block';
                 } else {
-                    wrap.style.display = 'none';
+                    box.style.display = 'none';
                 }
             }
 
-            setField('iptablesWrap', 'iptablesCode', data.iptables);
-            setField('windowsWrap', 'windowsCode', data.windows_firewall);
-            setField('dnsWrap', 'dnsCode', data.dns_sinkhole);
-            setField('idsWrap', 'idsCode', data.suricata_snort);
+            setField('remedIptablesBox', 'remedIptables', data.iptables);
+            setField('remedWinFwBox', 'remedWinFw', data.windows_firewall);
+            setField('remedDnsBox', 'remedDns', data.dns_sinkhole);
+            setField('remedSuricataBox', 'remedSuricata', data.suricata_snort);
         })
         .catch(err => {
-            document.getElementById('remedLoading').innerHTML = '<span class="text-danger">Failed to load remediation rules.</span>';
+            document.getElementById('remedLoading').innerHTML = '<span class="text-danger">Failed to generate remediation rules.</span>';
         });
+}
+
+function copyText(elementId) {
+    var text = document.getElementById(elementId).textContent;
+    navigator.clipboard.writeText(text).then(() => {
+        alert("Rule copied to clipboard!");
+    });
 }
 </script>
 {% endblock %}

@@ -13,10 +13,16 @@ __pycache__/
 # Environment variables (keep .env.example)
 .env
 
-# SQLite Databases & temporary lock files
+# SQLite Databases, backups & temporary lock files
 *.db
 *.db-shm
 *.db-wal
+*.backup
+*.bak
+sentinel_backup_*
+test_*.db*
+test_*.db-shm
+test_*.db-wal
 
 # Ingested logs and uploaded files
 auto_ingest/*.log
@@ -26,6 +32,12 @@ auto_ingest/*.json
 !auto_ingest/.gitkeep
 uploads/*
 !uploads/.gitkeep
+
+# Transient benchmarks and temporary logs
+temp_*.log
+*.log.temp
+*.tmp
+test_*.log
 
 # Editor & OS files
 .vscode/

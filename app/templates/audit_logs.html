@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}SENTINEL // SOC Audit Trails{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h3 class="fw-bold mb-1"><i class="bi bi-journal-text text-info me-2"></i>SOC Operational Audit Trails</h3>
+        <p class="text-secondary small mb-0">Immutable records of analyst activities, triage decisions, and system events.</p>
+    </div>
+</div>
+
+<div class="card card-soc">
+    <div class="card-soc-header d-flex align-items-center justify-content-between">
+        <span class="fw-semibold small text-uppercase" style="letter-spacing: 0.05em;">Security Audit Log (Last 200 Entries)</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-soc mb-0">
+            <thead>
+                <tr>
+                    <th style="width: 80px;">ID</th>
+                    <th style="width: 170px;">Timestamp</th>
+                    <th>User</th>
+                    <th>Action</th>
+                    <th>Event Details</th>
+                    <th>Client IP</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in audit_logs %}
+                <tr>
+                    <td class="font-mono text-muted">#{{ log.id }}</td>
+                    <td class="font-mono text-muted small">
+                        {{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') if log.timestamp else '--' }}
+                    </td>
+                    <td>
+                        <span class="badge bg-secondary font-mono">{{ log.user }}</span>
+                    </td>
+                    <td>
+                        <span class="badge {% if 'failed' in log.action or 'blocked' in log.action %}bg-danger{% elif 'created' in log.action or 'add' in log.action %}bg-success{% elif 'update' in log.action %}bg-info text-dark{% else %}bg-dark border border-secondary{% endif %} font-mono">
+                            {{ log.action }}
+                        </span>
+                    </td>
+                    <td class="font-mono text-white small text-break">
+                        {{ log.details or '--' }}
+                    </td>
+                    <td class="font-mono text-muted small">
+                        {{ log.ip_address or '127.0.0.1' }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center py-4 text-muted">
+                        No audit events recorded yet.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+

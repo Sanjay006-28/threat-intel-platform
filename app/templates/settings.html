@@ -84,17 +84,21 @@
             <div class="col-md-2">
                 <select name="type" class="form-select form-select-sm bg-dark text-white border-secondary" required>
                     <option value="ipv4">IPv4 Address</option>
+                    <option value="cidr">CIDR Subnet</option>
                     <option value="domain">Domain</option>
                     <option value="url">URL</option>
                     <option value="hash">Hash</option>
                     <option value="email">Email</option>
                 </select>
             </div>
-            <div class="col-md-4">
-                <input type="text" name="value" class="form-control form-control-sm bg-dark text-white border-secondary font-mono" placeholder="e.g., 8.8.8.8 or company-portal.com" required>
+            <div class="col-md-3">
+                <input type="text" name="value" class="form-control form-control-sm bg-dark text-white border-secondary font-mono" placeholder="e.g. 8.8.8.8 or 10.0.0.0/8" required>
             </div>
-            <div class="col-md-4">
-                <input type="text" name="description" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Reason (e.g., Internal DNS resolver)">
+            <div class="col-md-3">
+                <input type="text" name="description" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Description (e.g. Internal Gateway)">
+            </div>
+            <div class="col-md-2">
+                <input type="text" name="reason" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Justification">
             </div>
             <div class="col-md-2">
                 <button type="submit" class="btn btn-sm btn-success w-100">
@@ -107,9 +111,10 @@
             <table class="table table-soc align-middle mb-0">
                 <thead>
                     <tr>
-                        <th style="width: 120px;">Type</th>
+                        <th style="width: 110px;">Type</th>
                         <th>Whitelisted Value</th>
                         <th>Description</th>
+                        <th>Justification</th>
                         <th style="width: 80px;" class="text-end">Action</th>
                     </tr>
                 </thead>
@@ -119,6 +124,7 @@
                         <td><span class="badge bg-secondary font-mono">{{ entry.type|upper }}</span></td>
                         <td class="font-mono text-white">{{ entry.value }}</td>
                         <td class="text-muted small">{{ entry.description or 'No description' }}</td>
+                        <td class="text-info small font-mono">{{ entry.reason or '--' }}</td>
                         <td class="text-end">
                             <form action="/settings/whitelist/remove/{{ entry.id }}" method="POST" style="display:inline;">
                                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Remove Rule">

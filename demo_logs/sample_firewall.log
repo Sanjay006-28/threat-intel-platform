@@ -1,0 +1,10 @@
+# Linux iptables & pfSense Firewall Log Sample
+# Generated for SENTINEL Local SOC Demonstration
+Oct 30 10:00:01 firewall-edge kernel: [ACCEPT] IN=eth0 OUT=eth1 SRC=192.168.1.15 DST=1.1.1.1 PROTO=UDP SPT=51234 DPT=53
+Oct 30 10:00:02 firewall-edge kernel: [ACCEPT] IN=eth0 OUT=eth1 SRC=192.168.1.15 DST=140.82.121.4 PROTO=TCP SPT=49152 DPT=443
+Oct 30 10:00:15 firewall-edge kernel: [ACCEPT] IN=eth0 OUT=eth1 SRC=192.168.1.22 DST=13.107.42.14 PROTO=TCP SPT=55210 DPT=443
+Oct 30 10:01:30 firewall-edge kernel: [DENY] IN=eth0 OUT=eth1 SRC=192.168.1.50 DST=185.220.101.5 PROTO=TCP SPT=52311 DPT=443 [C2 Outbound Attempt]
+Oct 30 10:02:45 firewall-edge kernel: [ACCEPT] IN=eth0 OUT=eth1 SRC=192.168.1.88 DST=8.8.8.8 PROTO=UDP SPT=54211 DPT=53
+Oct 30 10:03:12 firewall-edge kernel: [DROP] IN=eth0 OUT=eth1 SRC=192.168.1.88 DST=194.26.29.112 PROTO=TCP SPT=49882 DPT=8080 [Blacklisted Subnet CIDR]
+Oct 30 10:04:00 firewall-edge kernel: [ACCEPT] IN=eth0 OUT=eth1 SRC=192.168.1.100 DST=172.217.16.206 PROTO=TCP SPT=60112 DPT=443
+

@@ -8,12 +8,14 @@ services:
       - "8000:8000"
     environment:
       - DATABASE_URL=sqlite:///./threat_intel.db
-      - DEV_AUTO_LOGIN=True
-      - ADMIN_USERNAME=admin
-      - ADMIN_PASSWORD=changeme123
-      - SECRET_KEY=supersecretkey-sentinel-cti-platform
+      - DEV_AUTO_LOGIN=False
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-changeme123}
+      - SECRET_KEY=${SECRET_KEY:-supersecretkey-sentinel-cti-platform}
       - AUTO_INGEST_DIR=./auto_ingest
+      - IOC_TTL_DAYS=30
+      - SCHEDULER_INTERVAL_MINUTES=360
     volumes:
-      - ./threat_intel.db:/app/threat_intel.db
+      - ./:/app
       - ./auto_ingest:/app/auto_ingest
     restart: unless-stopped

@@ -21,6 +21,7 @@ class BaseCollector(ABC):
     def normalize_records(self, raw_records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
         Normalizes fetched records using the normalizer.
+        Sets is_feed_ioc=True to reject RFC1918/loopback ranges.
         """
         normalized = []
         seen = set()
@@ -29,7 +30,7 @@ class BaseCollector(ABC):
             if not raw_val:
                 continue
             
-            ioc_type, norm_val = detect_and_normalize(raw_val)
+            ioc_type, norm_val = detect_and_normalize(raw_val, is_feed_ioc=True)
             if not ioc_type or not norm_val:
                 continue
                 
