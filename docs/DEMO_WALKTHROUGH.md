@@ -12,7 +12,7 @@ This guide provides a structured, live demonstration script for presentations, c
 ## 1. Pre-Demo Verification Checklist
 Before starting the demo:
 - [ ] Confirm Python virtual environment is activated (`.\.venv\Scripts\Activate.ps1`).
-- [ ] Verify test suite passes (`python test_match.py`).
+- [ ] Verify test suite passes (`python tests/test_match.py`).
 - [ ] Ensure database backup exists (`python manage_backup.py backup`).
 - [ ] Verify `auto_ingest/` is empty (except `.gitkeep`).
 

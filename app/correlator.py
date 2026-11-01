@@ -20,10 +20,11 @@ def extract_endpoint_identity(event: LogEvent, matched_ioc_val: str) -> str:
     the same indicator generate separate alerts rather than being merged.
     """
     raw = event.raw_line or ""
+    
     # 1. Key-value firewall patterns (SRC=... or source=...)
-    fw_match = re.search(r'\b(?:SRC|src|source|srcip|saddr)=([^\s,;]+)', raw, re.IGNORECASE)
+    fw_match = re.search(r'\b(?:SRC|src|source|srcip|saddr|client_ip)=([^\s,;]+)', raw, re.IGNORECASE)
     if fw_match:
-        val = fw_match.group(1).strip()
+        val = fw_match.group(1).strip().strip('"\'')
         if val != matched_ioc_val:
             return val
 
@@ -31,14 +32,27 @@ def extract_endpoint_identity(event: LogEvent, matched_ioc_val: str) -> str:
     if raw.startswith("{") and raw.endswith("}"):
         try:
             doc = json.loads(raw)
-            for k in ["src_ip", "client_ip", "src", "id.orig_h", "source_ip", "host"]:
+            for k in ["src_ip", "client_ip", "src", "id.orig_h", "source_ip", "host", "computer_name"]:
                 val = str(doc.get(k, "")).strip()
                 if val and val != matched_ioc_val:
                     return val
         except Exception:
             pass
 
-    # 3. Check extracted artifacts for private RFC1918 / loopback IP or any IP != matched_ioc_val
+    # 3. Connection flow syntax: "192.168.1.50:52311 -> 185.220.101.5:443" or "FROM 192.168.1.77" or "at 192.168.1.50"
+    flow_match = re.search(r'\b((?:\d{1,3}\.){3}\d{1,3})(?::\d+)?\s*(?:->|-->|to)\s*', raw)
+    if flow_match:
+        val = flow_match.group(1)
+        if val != matched_ioc_val:
+            return val
+
+    from_match = re.search(r'\b(?:FROM|from|at|client)\s+((?:\d{1,3}\.){3}\d{1,3})', raw)
+    if from_match:
+        val = from_match.group(1)
+        if val != matched_ioc_val:
+            return val
+
+    # 4. Check extracted artifacts for private RFC1918 / loopback IP or any IP != matched_ioc_val
     if event.extracted_artifacts:
         candidates = []
         for art in event.extracted_artifacts:
@@ -55,7 +69,26 @@ def extract_endpoint_identity(event: LogEvent, matched_ioc_val: str) -> str:
         if candidates:
             return candidates[0]
 
-    return "host-default"
+    # 5. Regex search for any private RFC1918 IPv4 in the raw line
+    all_ips = re.findall(r'\b(?:\d{1,3}\.){3}\d{1,3}\b', raw)
+    for candidate_ip in all_ips:
+        if candidate_ip != matched_ioc_val:
+            try:
+                if ipaddress.ip_address(candidate_ip).is_private:
+                    return candidate_ip
+            except ValueError:
+                pass
+
+    # 6. Check for user / host identifier in log
+    user_match = re.search(r'\b(?:user|username|account):\s*([a-zA-Z0-9_\-\.\$]+)', raw, re.IGNORECASE)
+    if user_match:
+        return f"User: {user_match.group(1)}"
+
+    host_match = re.search(r'\b(?:Host|hostname):\s*([a-zA-Z0-9_\-\.]+)', raw, re.IGNORECASE)
+    if host_match and host_match.group(1) != matched_ioc_val:
+        return f"Host: {host_match.group(1)}"
+
+    return "Internal Network (Edge/Proxy)"
 
 class Correlator:
     def __init__(self, db: Session):
@@ -63,30 +96,58 @@ class Correlator:
         # Load active IOCs into memory for O(1) matching
         self.active_iocs = self.db.query(IOC).filter(IOC.is_active == True).all()
         
-        # Load whitelist entries with typed structures
-        self.whitelist_exact: Set[str] = set()
-        self.whitelist_domains: Set[str] = set()
-        self.whitelist_cidrs: List[Any] = []
-        
-        for w in self.db.query(Whitelist).all():
-            val = w.value.strip()
-            self.whitelist_exact.add(val)
-            if w.type == "domain":
-                self.whitelist_domains.add(val.lower())
-            elif "/" in val and ("ip" in w.type or w.type == "cidr"):
+        # Load only active, non-deleted, non-expired whitelist policies
+        now = datetime.now(timezone.utc)
+        self.whitelist_exact: Dict[str, Whitelist] = {}
+        self.whitelist_domains: Dict[str, Whitelist] = {}
+        self.whitelist_cidrs: List[Tuple[Any, Whitelist]] = []
+        self.whitelist_urls: Dict[str, Whitelist] = {}
+        self.whitelist_hashes: Dict[str, Whitelist] = {}
+
+        active_policies = self.db.query(Whitelist).filter(
+            Whitelist.is_active == True,
+            Whitelist.is_deleted == False
+        ).all()
+
+        for w in active_policies:
+            if w.expires_at:
+                exp = w.expires_at.replace(tzinfo=timezone.utc) if w.expires_at.tzinfo is None else w.expires_at
+                if exp <= now:
+                    continue  # Expired policy ceases to suppress
+
+            val = (w.value or "").strip()
+            if not val:
+                continue
+
+            typ = (w.type or "").lower().strip()
+            self.whitelist_exact[val] = w
+
+            if typ == "domain":
+                self.whitelist_domains[val.lower()] = w
+            elif typ == "url" or "://" in val:
+                self.whitelist_urls[val.lower()] = w
+            elif typ == "ipv6" or (":" in val and "/" not in val and "://" not in val):
                 try:
-                    self.whitelist_cidrs.append(ipaddress.ip_network(val, strict=False))
+                    ip_v6 = ipaddress.IPv6Address(val)
+                    self.whitelist_exact[str(ip_v6)] = w
+                    self.whitelist_exact[ip_v6.exploded] = w
+                    self.whitelist_exact[ip_v6.compressed] = w
                 except ValueError:
                     pass
+            elif typ in ["ipv4", "cidr"] or ("/" in val and "://" not in val and ("." in val or ":" in val)):
+                try:
+                    net = ipaddress.ip_network(val, strict=False)
+                    self.whitelist_cidrs.append((net, w))
+                except ValueError:
+                    pass
+            elif typ in ["md5", "sha1", "sha256", "hash"] or len(val) in [32, 40, 64]:
+                self.whitelist_hashes[val.lower()] = w
 
         self.exact_matches: Dict[str, IOC] = {}
         self.domains: Set[str] = set()
         self.cidr_networks: List[Tuple[Any, IOC]] = []
         
         for ioc in self.active_iocs:
-            if self.is_whitelisted(ioc.value, ioc.type):
-                continue
-                
             self.exact_matches[ioc.value] = ioc
 
             if ioc.type == "domain":
@@ -100,34 +161,101 @@ class Correlator:
                 except ValueError:
                     pass
 
-    def is_whitelisted(self, value: str, ioc_type: str = "") -> bool:
-        """Checks if an indicator or domain/IP is covered by an active whitelist rule."""
+    def get_matching_whitelist_policy(self, value: str, ioc_type: str = "") -> Optional[Whitelist]:
+        """
+        Returns the active Whitelist policy covering the given indicator if suppressed,
+        or None if not suppressed.
+        """
         if not value:
-            return False
+            return None
             
         clean_val = value.strip()
+        lower_val = clean_val.lower()
+        typ = (ioc_type or "").lower().strip()
+
+        # 1. Exact match (including IPv6 canonical / exploded / compressed)
         if clean_val in self.whitelist_exact:
-            return True
+            return self.whitelist_exact[clean_val]
+        if lower_val in self.whitelist_exact:
+            return self.whitelist_exact[lower_val]
 
-        # Check domain label boundaries
-        if ioc_type == "domain" or ("." in clean_val and "/" not in clean_val):
-            parts = clean_val.lower().split(".")
-            for i in range(len(parts) - 1):
-                parent = ".".join(parts[i:])
-                if parent in self.whitelist_domains:
-                    return True
-
-        # Check IP inside whitelisted CIDR range
-        if ioc_type in ["ipv4", "ipv6", "ip"] or ("." in clean_val or ":" in clean_val):
+        if typ == "ipv6" or (":" in clean_val and "/" not in clean_val):
             try:
-                ip_obj = ipaddress.ip_address(clean_val)
-                for net in self.whitelist_cidrs:
-                    if ip_obj in net:
-                        return True
+                ip_v6_in = ipaddress.IPv6Address(clean_val)
+                if str(ip_v6_in) in self.whitelist_exact:
+                    return self.whitelist_exact[str(ip_v6_in)]
+                if ip_v6_in.exploded in self.whitelist_exact:
+                    return self.whitelist_exact[ip_v6_in.exploded]
+                if ip_v6_in.compressed in self.whitelist_exact:
+                    return self.whitelist_exact[ip_v6_in.compressed]
             except ValueError:
                 pass
 
-        return False
+        # 2. Hash match
+        if lower_val in self.whitelist_hashes:
+            return self.whitelist_hashes[lower_val]
+
+        # 3. URL match (exact match and path-prefix matching)
+        if lower_val in self.whitelist_urls:
+            return self.whitelist_urls[lower_val]
+
+        if typ == "url" or clean_val.startswith(("http://", "https://")):
+            # Check path-prefix matching against configured URL policies
+            for wl_url, pol in self.whitelist_urls.items():
+                if lower_val == wl_url:
+                    return pol
+                # Match subpaths or query strings: e.g. https://corp.net/health matches https://corp.net/health?check=1 or https://corp.net/health/v1
+                if lower_val.startswith(wl_url.rstrip("/") + "/") or lower_val.startswith(wl_url + "?") or lower_val.startswith(wl_url + "#"):
+                    return pol
+
+        # 4. Domain matching respecting DNS label boundaries
+        typ = (ioc_type or "").lower().strip()
+        if typ == "domain" or ("." in clean_val and "/" not in clean_val and ":" not in clean_val):
+            parts = lower_val.split(".")
+            for i in range(len(parts) - 1):
+                parent = ".".join(parts[i:])
+                if parent in self.whitelist_domains:
+                    return self.whitelist_domains[parent]
+
+        # 5. IP inside whitelisted CIDR range
+        if typ in ["ipv4", "ipv6", "ip"] or ("." in clean_val or ":" in clean_val):
+            try:
+                ip_obj = ipaddress.ip_address(clean_val)
+                for net, pol in self.whitelist_cidrs:
+                    if ip_obj in net:
+                        return pol
+            except ValueError:
+                pass
+
+        # 6. URL host against domain & CIDR whitelist
+        if typ == "url" or clean_val.startswith(("http://", "https://")):
+            try:
+                import urllib.parse
+                parsed = urllib.parse.urlparse(clean_val)
+                host = (parsed.hostname or "").lower()
+                if host:
+                    if host in self.whitelist_domains:
+                        return self.whitelist_domains[host]
+                    parts = host.split(".")
+                    for i in range(len(parts) - 1):
+                        parent = ".".join(parts[i:])
+                        if parent in self.whitelist_domains:
+                            return self.whitelist_domains[parent]
+                    try:
+                        ip_obj = ipaddress.ip_address(host)
+                        for net, pol in self.whitelist_cidrs:
+                            if ip_obj in net:
+                                return pol
+                    except ValueError:
+                        pass
+            except Exception:
+                pass
+
+        return None
+
+    def is_whitelisted(self, value: str, ioc_type: str = "") -> bool:
+        """Checks if an indicator or domain/IP is covered by an active whitelist rule."""
+        return self.get_matching_whitelist_policy(value, ioc_type) is not None
 
     def _fuzzy_domain_lookup(self, domain: str) -> Optional[IOC]:
         """
@@ -168,7 +296,18 @@ class Correlator:
             typ = artifact["type"]
             
             # Check Whitelist suppression first
-            if self.is_whitelisted(val, typ):
+            matched_policy = self.get_matching_whitelist_policy(val, typ)
+            if matched_policy:
+                try:
+                    from app.audit import log_audit
+                    log_audit(
+                        self.db,
+                        "system",
+                        "alert_suppressed",
+                        f"Suppressed {typ} [{val}] matching policy #{matched_policy.id} ({matched_policy.type}: {matched_policy.value}). Reason: {matched_policy.reason}"
+                    )
+                except Exception as e:
+                    logger.debug(f"Audit log record error: {e}")
                 continue
 
             matched = None

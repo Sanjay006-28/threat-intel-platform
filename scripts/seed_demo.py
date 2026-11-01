@@ -1,14 +1,18 @@
 import os
 import sys
 
-# Ensure app is in path
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+# Ensure project root and scripts directory are in sys.path
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+if os.path.dirname(__file__) not in sys.path:
+    sys.path.insert(0, os.path.dirname(__file__))
 
 from app.database import Base, engine, SessionLocal
 from app.collectors.runner import run_all_collectors
 from app.models import IOC, IOCSource, Feed, FeedRun, LogFile, LogEvent, Alert, Whitelist
 from app.correlator import Correlator
-from generate_mock_logs import generate_sample_log_file
+from scripts.generate_mock_logs import generate_sample_log_file
 import logging
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
@@ -22,7 +26,9 @@ def seed_demo():
     run_all_collectors()
     
     print("[*] Generating mock log file...")
-    log_file_path = generate_sample_log_file("demo_security.log")
+    demo_log_dir = os.path.join(BASE_DIR, "demo_logs")
+    os.makedirs(demo_log_dir, exist_ok=True)
+    log_file_path = generate_sample_log_file(os.path.join(demo_log_dir, "demo_security.log"))
     
     print("[*] Processing mock log file...")
     db = SessionLocal()

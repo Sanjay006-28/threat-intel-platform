@@ -3,7 +3,7 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -102,6 +102,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
         # Enforce authenticated session
         if not request.session.get("user"):
+            if request.url.path.startswith("/api/"):
+                return JSONResponse(status_code=401, content={"detail": "Authentication required"})
             return RedirectResponse(url="/login", status_code=303)
 
         # Enforce forced first-login password change for default credentials

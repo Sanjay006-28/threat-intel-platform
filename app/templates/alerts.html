@@ -1,39 +1,51 @@
 {% extends "base.html" %}
-{% block title %}Security Alerts - SENTINEL CTI{% endblock %}
+{% block title %}Security Alerts // SENTINEL CTI{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
     <div>
-        <h3 class="fw-bold mb-1"><i class="bi bi-exclamation-octagon text-danger me-2"></i>Correlated Threat Alerts</h3>
-        <p class="text-secondary small mb-0">High-fidelity security detections aggregated by time-window to prevent alert flooding.</p>
+        <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="badge bg-primary bg-opacity-25 text-info border border-info border-opacity-50 small font-mono">DETECTIONS</span>
+            <span class="text-muted small">|</span>
+            <span class="text-secondary small">Correlated Threat Alert Stream</span>
+        </div>
+        <h3 class="fw-bold mb-0 text-white"><i class="bi bi-exclamation-octagon text-danger me-2"></i>Correlated Threat Alerts</h3>
+        <p class="text-secondary small mb-0 mt-1">High-fidelity security detections aggregated by endpoint and time-window to prevent analyst alert flooding.</p>
     </div>
     <div class="d-flex gap-2">
-        <a href="/incidents" class="btn btn-sm btn-outline-warning">
-            <i class="bi bi-folder-check me-1"></i> View Incidents
+        <a href="/incidents" class="btn btn-sm btn-outline-warning d-flex align-items-center gap-1">
+            <i class="bi bi-folder-check"></i>
+            <span>View Incidents</span>
         </a>
-        <a href="/logs" class="btn btn-sm btn-outline-info">
-            <i class="bi bi-file-earmark-arrow-up me-1"></i> Ingest New Log
+        <a href="/logs" class="btn btn-sm btn-outline-info d-flex align-items-center gap-1">
+            <i class="bi bi-file-earmark-arrow-up"></i>
+            <span>Ingest New Log</span>
         </a>
     </div>
 </div>
 
 <div class="card card-soc">
-    <div class="card-soc-header d-flex align-items-center justify-content-between">
-        <span class="fw-semibold text-white">Aggregated Detections ({{ enriched_alerts|length }})</span>
-        <span class="badge bg-dark border border-secondary font-mono text-muted">1-Hour Time Window Aggregation</span>
+    <div class="card-soc-header d-flex flex-wrap align-items-center justify-content-between gap-2 py-2 px-3">
+        <div class="d-flex align-items-center gap-2">
+            <span class="fw-semibold text-white">Aggregated Detections</span>
+            <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 font-mono" style="font-size: 0.72rem;">{{ enriched_alerts|length }} TOTAL</span>
+        </div>
+        <span class="badge bg-dark border border-secondary font-mono text-muted" style="font-size: 0.72rem;">
+            <i class="bi bi-clock-history me-1"></i>1-Hour Window Aggregation Grouping
+        </span>
     </div>
-    <div class="table-responsive">
-        <table class="table table-soc align-middle mb-0">
+    <div class="table-responsive" style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
+        <table class="table table-soc align-middle mb-0" style="table-layout: fixed; min-width: 1020px; width: 100%;">
             <thead>
-                <tr>
-                    <th style="width: 60px;">ID</th>
-                    <th>Threat Indicator</th>
-                    <th>Occurrences</th>
-                    <th>MITRE ATT&CK</th>
-                    <th>Severity & Score</th>
-                    <th>Status</th>
-                    <th>Case Link</th>
-                    <th class="text-end">Actions</th>
+                <tr class="text-muted text-uppercase" style="font-size: 0.72rem; letter-spacing: 0.06em;">
+                    <th style="width: 60px; white-space: nowrap;">ID</th>
+                    <th style="width: 210px;">Threat Indicator</th>
+                    <th style="width: 90px; text-align: center; white-space: nowrap;">Occurrences</th>
+                    <th style="width: 170px;">MITRE ATT&CK</th>
+                    <th style="width: 125px; white-space: nowrap;">Severity & Risk</th>
+                    <th style="width: 115px; white-space: nowrap;">Status</th>
+                    <th style="width: 110px; white-space: nowrap;">Case Link</th>
+                    <th style="width: 140px; text-align: end; white-space: nowrap;">Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -41,48 +53,53 @@
                 {% set alert = item.alert %}
                 {% set mitre = item.mitre %}
                 <tr>
-                    <td class="font-mono text-muted">#{{ alert.id }}</td>
+                    <td class="font-mono text-muted text-nowrap" style="font-size: 0.8rem;">#{{ alert.id }}</td>
                     <td>
-                        <div class="d-flex flex-column">
-                            <a href="/alerts/{{ alert.id }}" class="font-mono fw-bold text-info text-decoration-none text-break" style="font-size: 0.9rem;">
+                        <div class="d-flex flex-column" style="max-width: 200px;">
+                            <a href="/alerts/{{ alert.id }}" class="font-mono fw-bold text-info text-decoration-none text-truncate d-inline-block align-middle" style="font-size: 0.88rem;" title="{{ alert.matched_value }}">
                                 {{ alert.matched_value }}
                             </a>
-                            <div class="d-flex align-items-center gap-1 mt-1">
-                                <span class="badge bg-secondary text-uppercase font-mono" style="font-size: 0.65rem;">
+                            <div class="d-flex align-items-center gap-1 mt-1 flex-wrap">
+                                <span class="badge bg-secondary bg-opacity-25 text-white border border-secondary text-uppercase font-mono" style="font-size: 0.62rem;">
                                     {{ alert.matched_type }}
                                 </span>
-                                <span class="text-muted small font-mono" style="font-size: 0.72rem;">
-                                    Last: {{ alert.last_seen.strftime('%H:%M:%S') if alert.last_seen else '--' }}
+                                {% if item.endpoint and item.endpoint != "Internal Network (Edge/Proxy)" %}
+                                <span class="badge bg-dark border border-secondary text-secondary font-mono text-truncate" style="font-size: 0.62rem; max-width: 90px;" title="Affected Host: {{ item.endpoint }}">
+                                    <i class="bi bi-hdd-network me-1"></i>{{ item.endpoint }}
+                                </span>
+                                {% endif %}
+                                <span class="text-muted small font-mono ms-auto" style="font-size: 0.68rem;" title="Last Observed UTC Timestamp">
+                                    {{ alert.last_seen.strftime('%H:%M:%S UTC') if alert.last_seen else '--' }}
                                 </span>
                             </div>
                         </div>
                     </td>
-                    <td>
-                        <span class="badge bg-dark border border-secondary text-info font-mono fs-6 px-2 py-1">
+                    <td class="text-center text-nowrap">
+                        <span class="badge bg-dark border border-secondary text-info font-mono px-2 py-1" style="font-size: 0.82rem;" title="{{ alert.hit_count or 1 }} aggregated occurrence(s) in this deduplication window">
                             {{ alert.hit_count or 1 }}x
                         </span>
                     </td>
                     <td>
                         {% if mitre %}
-                        <div class="d-flex flex-column gap-1">
-                            <span class="badge bg-secondary font-mono align-self-start" style="font-size: 0.68rem;">
+                        <div class="d-flex flex-column gap-1" style="max-width: 160px;">
+                            <span class="badge bg-secondary bg-opacity-25 text-white border border-secondary font-mono text-truncate d-inline-block" style="max-width: 155px; font-size: 0.68rem;" title="{{ mitre.technique_id }}: {{ mitre.technique_name }} ({{ mitre.tactic }})">
                                 {{ mitre.technique_id }}: {{ mitre.technique_name }}
                             </span>
-                            <span class="text-muted small" style="font-size: 0.72rem;">{{ mitre.tactic }}</span>
+                            <span class="text-muted small text-truncate" style="font-size: 0.7rem;" title="{{ mitre.tactic }}">{{ mitre.tactic }}</span>
                         </div>
                         {% else %}
-                        <span class="text-muted small">Generic Intel</span>
+                        <span class="text-muted small" style="font-size: 0.75rem;">Generic Threat Intel</span>
                         {% endif %}
                     </td>
-                    <td>
-                        <span class="badge badge-severity-{{ alert.severity }} px-2 py-1">
+                    <td class="text-nowrap">
+                        <span class="badge badge-severity-{{ alert.severity }} px-2 py-1" style="font-size: 0.72rem;">
                             {{ alert.severity|upper }}
                         </span>
-                        <span class="font-mono small text-muted ms-1">{{ alert.score }}/100</span>
+                        <span class="font-mono small text-white ms-1 fw-semibold" style="font-size: 0.75rem;">{{ alert.score }}/100</span>
                     </td>
-                    <td>
+                    <td class="text-nowrap">
                         <form action="/alerts/{{ alert.id }}/status" method="POST" class="d-inline">
-                            <select name="status" class="form-select form-select-sm bg-dark text-white border-secondary" style="font-size: 0.78rem; width: 130px;" onchange="this.form.submit()">
+                            <select name="status" class="form-select form-select-sm bg-dark text-white border-secondary" style="font-size: 0.75rem; width: 105px; padding: 0.25rem 0.35rem;" onchange="this.form.submit()">
                                 <option value="new" {% if alert.status == 'new' %}selected{% endif %}>New</option>
                                 <option value="investigating" {% if alert.status == 'investigating' %}selected{% endif %}>Investigating</option>
                                 <option value="resolved" {% if alert.status == 'resolved' %}selected{% endif %}>Resolved</option>
@@ -90,19 +107,19 @@
                             </select>
                         </form>
                     </td>
-                    <td>
+                    <td class="text-nowrap">
                         {% if alert.incident_id %}
-                        <a href="/incidents/{{ alert.incident_id }}" class="badge bg-warning text-dark text-decoration-none font-mono">
+                        <a href="/incidents/{{ alert.incident_id }}" class="badge bg-warning bg-opacity-15 text-warning border border-warning border-opacity-25 text-decoration-none font-mono" style="font-size: 0.7rem;">
                             Case #{{ alert.incident_id }}
                         </a>
                         {% else %}
-                        <span class="text-muted small font-mono">Unassigned</span>
+                        <span class="text-muted small font-mono" style="font-size: 0.72rem;">Unassigned</span>
                         {% endif %}
                     </td>
-                    <td class="text-end">
+                    <td class="text-end text-nowrap">
                         <div class="btn-group btn-group-sm">
                             <a href="/alerts/{{ alert.id }}" class="btn btn-outline-info" title="Deep Investigation">
-                                <i class="bi bi-search"></i> Inspect
+                                <i class="bi bi-search"></i> <span class="ms-1">Inspect</span>
                             </a>
                             <button type="button" class="btn btn-outline-warning" title="View Containment Rules" onclick="openRemediationModal('{{ alert.id }}', '{{ alert.matched_value }}', '{{ alert.matched_type }}')">
                                 <i class="bi bi-shield-slash"></i>
@@ -137,7 +154,7 @@
             </div>
             <div class="modal-body">
                 <div class="alert alert-warning py-2 small mb-3">
-                    <i class="bi bi-info-circle me-1"></i> <strong>Analyst Notice:</strong> These rules are generated for manual verification and deployment. SENTINEL does not apply firewall rules automatically.
+                    <i class="bi bi-info-circle me-1"></i> <strong>Passive Advisory:</strong> These rules are generated for manual verification and deployment. SENTINEL does not apply firewall rules automatically.
                 </div>
                 
                 <div id="remedLoading" class="text-center py-3">
@@ -148,7 +165,9 @@
                     <div class="mb-3" id="remedIptablesBox">
                         <div class="d-flex justify-content-between align-items-center mb-1">
                             <span class="text-secondary small fw-bold"><i class="bi bi-terminal me-1"></i>Linux iptables Drop Rule</span>
-                            <button class="btn btn-xs btn-outline-secondary copy-btn" onclick="copyText('remedIptables')">Copy</button>
+                            <button class="btn btn-xs btn-outline-secondary copy-btn font-mono" style="font-size: 0.7rem; padding: 2px 8px;" onclick="copyCode(this, 'remedIptables')">
+                                <i class="bi bi-clipboard me-1"></i>Copy
+                            </button>
                         </div>
                         <pre id="remedIptables" class="p-2 bg-dark rounded border border-secondary font-mono text-info small mb-0"></pre>
                     </div>
@@ -156,7 +175,9 @@
                     <div class="mb-3" id="remedWinFwBox">
                         <div class="d-flex justify-content-between align-items-center mb-1">
                             <span class="text-secondary small fw-bold"><i class="bi bi-windows me-1"></i>Windows Defender Firewall (PowerShell)</span>
-                            <button class="btn btn-xs btn-outline-secondary copy-btn" onclick="copyText('remedWinFw')">Copy</button>
+                            <button class="btn btn-xs btn-outline-secondary copy-btn font-mono" style="font-size: 0.7rem; padding: 2px 8px;" onclick="copyCode(this, 'remedWinFw')">
+                                <i class="bi bi-clipboard me-1"></i>Copy
+                            </button>
                         </div>
                         <pre id="remedWinFw" class="p-2 bg-dark rounded border border-secondary font-mono text-warning small mb-0"></pre>
                     </div>
@@ -164,7 +185,9 @@
                     <div class="mb-3" id="remedDnsBox">
                         <div class="d-flex justify-content-between align-items-center mb-1">
                             <span class="text-secondary small fw-bold"><i class="bi bi-hdd-network me-1"></i>DNS Sinkhole (/etc/hosts / Pi-hole)</span>
-                            <button class="btn btn-xs btn-outline-secondary copy-btn" onclick="copyText('remedDns')">Copy</button>
+                            <button class="btn btn-xs btn-outline-secondary copy-btn font-mono" style="font-size: 0.7rem; padding: 2px 8px;" onclick="copyCode(this, 'remedDns')">
+                                <i class="bi bi-clipboard me-1"></i>Copy
+                            </button>
                         </div>
                         <pre id="remedDns" class="p-2 bg-dark rounded border border-secondary font-mono text-success small mb-0"></pre>
                     </div>
@@ -172,7 +195,9 @@
                     <div class="mb-3" id="remedSuricataBox">
                         <div class="d-flex justify-content-between align-items-center mb-1">
                             <span class="text-secondary small fw-bold"><i class="bi bi-shield-exclamation me-1"></i>Suricata / Snort Signature</span>
-                            <button class="btn btn-xs btn-outline-secondary copy-btn" onclick="copyText('remedSuricata')">Copy</button>
+                            <button class="btn btn-xs btn-outline-secondary copy-btn font-mono" style="font-size: 0.7rem; padding: 2px 8px;" onclick="copyCode(this, 'remedSuricata')">
+                                <i class="bi bi-clipboard me-1"></i>Copy
+                            </button>
                         </div>
                         <pre id="remedSuricata" class="p-2 bg-dark rounded border border-secondary font-mono text-danger small mb-0"></pre>
                     </div>
@@ -223,10 +248,16 @@ function openRemediationModal(alertId, iocValue, iocType) {
         });
 }
 
-function copyText(elementId) {
+function copyCode(btn, elementId) {
     var text = document.getElementById(elementId).textContent;
     navigator.clipboard.writeText(text).then(() => {
-        alert("Rule copied to clipboard!");
+        var originalHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="bi bi-check2 text-success me-1"></i>Copied!';
+        btn.classList.add('border-success');
+        setTimeout(() => {
+            btn.innerHTML = originalHtml;
+            btn.classList.remove('border-success');
+        }, 2000);
     });
 }
 </script>

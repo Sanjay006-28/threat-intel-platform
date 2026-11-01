@@ -12,6 +12,8 @@ __pycache__/
 
 # Environment variables (keep .env.example)
 .env
+*.key
+.webhook_encryption.key
 
 # SQLite Databases, backups & temporary lock files
 *.db
@@ -19,10 +21,17 @@ __pycache__/
 *.db-wal
 *.backup
 *.bak
+backups/
 sentinel_backup_*
 test_*.db*
 test_*.db-shm
 test_*.db-wal
+
+# Test suites and test artifacts
+tests/
+test_*.py
+verify_*.py
+pytest.ini
 
 # Ingested logs and uploaded files
 auto_ingest/*.log
@@ -44,3 +53,11 @@ test_*.log
 .idea/
 .DS_Store
 Thumbs.db
+
+# Screenshots and media artifacts
+*.png
+*.jpg
+*.jpeg
+*.gif
+docs/screenshots/
+

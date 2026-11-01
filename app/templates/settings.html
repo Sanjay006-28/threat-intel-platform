@@ -1,43 +1,91 @@
 {% extends "base.html" %}
-{% block title %}Settings & Integration - SENTINEL CTI{% endblock %}
+{% block title %}Platform Settings & Whitelist Policies - SENTINEL CTI{% endblock %}
 
 {% block content %}
+<!-- Page Header -->
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
-        <h3 class="fw-bold mb-1">Platform Settings & Integrations</h3>
+        <h3 class="fw-bold mb-1 text-white">Platform Settings & Whitelist Policies</h3>
         <p class="text-secondary small mb-0">Configure real-time alert webhooks, STIX 2.1 intelligence sharing, and false-positive whitelists.</p>
     </div>
+    <div class="d-flex align-items-center gap-2">
+        <span class="badge bg-dark border border-secondary text-info px-3 py-2 font-mono">
+            <i class="bi bi-shield-check"></i> {{ whitelist_items|length }} Policies Configured
+        </span>
+    </div>
 </div>
+
+<!-- Dynamic Feedback Banners -->
+{% if success_msg %}
+<div class="alert alert-success d-flex align-items-center justify-content-between mb-4 border-0 shadow-sm" style="background: rgba(16, 185, 129, 0.15); border-left: 4px solid var(--accent-green) !important; color: #34D399;">
+    <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-check-circle-fill fs-5"></i>
+        <span>{{ success_msg }}</span>
+    </div>
+    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+{% endif %}
+
+{% if error_msg %}
+<div class="alert alert-danger d-flex align-items-center justify-content-between mb-4 border-0 shadow-sm" style="background: rgba(239, 68, 68, 0.15); border-left: 4px solid var(--accent-rose) !important; color: #F87171;">
+    <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+        <span>{{ error_msg }}</span>
+    </div>
+    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+{% endif %}
 
 <div class="row g-4">
     <!-- Webhook Integration Card -->
     <div class="col-12 col-lg-6">
         <div class="card card-soc h-100" style="border-left: 3px solid var(--accent-rose);">
             <div class="card-soc-header">
-                <span class="fw-semibold text-white">
+                <span class="fw-semibold text-white d-flex align-items-center gap-2">
                     <i class="bi bi-bell-fill text-danger"></i> Real-Time Alert Webhooks
                 </span>
-                <span class="badge bg-secondary font-mono">Discord / Slack / Generic</span>
+                <span class="badge bg-secondary font-mono">DISCORD / SLACK / HTTPS</span>
             </div>
-            <div class="p-3">
-                <p class="text-secondary small mb-3">
-                    Automatically dispatch an instant notification whenever the correlation engine detects a <span class="badge badge-severity-critical">CRITICAL</span> or <span class="badge badge-severity-high">HIGH</span> incident.
-                </p>
-                <form action="/settings/webhook" method="POST">
-                    <div class="mb-3">
-                        <label class="form-label small text-secondary">Incoming Webhook URL:</label>
-                        <input type="url" name="webhook_url" class="form-control form-control-sm bg-dark text-white border-secondary font-mono" placeholder="https://discord.com/api/webhooks/... or Slack" value="{{ webhook_url }}" required>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center">
-                        <button type="button" class="btn btn-sm btn-outline-warning" onclick="testCurrentWebhook()">
-                            <i class="bi bi-send-check"></i> Test Notification
-                        </button>
-                        <button type="submit" class="btn btn-sm btn-danger">
-                            <i class="bi bi-save"></i> Save Webhook URL
-                        </button>
-                    </div>
-                </form>
-                <div id="webhookTestMsg" class="small mt-2" style="display: none;"></div>
+            <div class="p-3 d-flex flex-column justify-content-between">
+                <div>
+                    <p class="text-secondary small mb-3">
+                        Dispatches automated instant incident payloads whenever the correlation engine identifies <span class="badge badge-severity-critical">CRITICAL</span> or <span class="badge badge-severity-high">HIGH</span> threats.
+                    </p>
+                    
+                    <form action="/settings/webhook" method="POST" id="webhookForm">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label small text-secondary mb-0">Destination Webhook URL (HTTPS):</label>
+                                {% if masked_webhook_url %}
+                                <span class="badge bg-dark text-muted font-mono" style="font-size: 0.7rem;" title="Masked active URL">
+                                    <i class="bi bi-lock-fill text-success"></i> {{ masked_webhook_url }}
+                                </span>
+                                {% endif %}
+                            </div>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-dark border-secondary text-secondary">
+                                    <i class="bi bi-link-45deg"></i>
+                                </span>
+                                <input type="url" name="webhook_url" id="webhookUrlInput" class="form-control form-control-sm bg-dark text-white border-secondary font-mono" placeholder="{% if masked_webhook_url %}Configured: {{ masked_webhook_url }} (leave blank to keep){% else %}https://discord.com/api/webhooks/...{% endif %}" value="" autocomplete="off">
+                            </div>
+                            <small class="text-muted" style="font-size: 0.72rem;">
+                                <i class="bi bi-shield-lock"></i> Strict SSRF defense: Loopback (127.0.0.1), private RFC1918 subnets, and cloud metadata IPs are prohibited. Complete credentials never exposed in UI.
+                            </small>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center pt-2">
+                            <button type="button" class="btn btn-sm btn-outline-warning d-flex align-items-center gap-1" onclick="testCurrentWebhook()">
+                                <i class="bi bi-send-check"></i>
+                                <span>Test Notification</span>
+                            </button>
+                            <button type="submit" class="btn btn-sm btn-danger d-flex align-items-center gap-1">
+                                <i class="bi bi-save"></i>
+                                <span>Save Webhook URL</span>
+                            </button>
+                        </div>
+                    </form>
+                    <div id="webhookTestMsg" class="small mt-2" style="display: none;"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -46,7 +94,7 @@
     <div class="col-12 col-lg-6">
         <div class="card card-soc h-100" style="border-left: 3px solid var(--accent-cyan);">
             <div class="card-soc-header">
-                <span class="fw-semibold text-white">
+                <span class="fw-semibold text-white d-flex align-items-center gap-2">
                     <i class="bi bi-share-fill text-info"></i> STIX 2.1 Threat Sharing
                 </span>
                 <span class="badge bg-info text-dark font-mono">OASIS STANDARD</span>
@@ -54,89 +102,162 @@
             <div class="p-3 d-flex flex-column justify-content-between">
                 <div>
                     <p class="text-secondary small mb-2">
-                        Export active Indicators of Compromise in standard <strong>OASIS STIX 2.1 JSON bundle</strong> format for seamless ingestion by SIEMs (Splunk, Microsoft Sentinel), MISP, or external defense partners.
+                        Export confirmed threat indicators in standard <strong>OASIS STIX 2.1 JSON bundle</strong> format for seamless bidirectional ingestion by enterprise SIEMs (Splunk, Microsoft Sentinel), MISP, and defense alliances.
                     </p>
-                    <ul class="text-secondary small ps-3 mb-3">
-                        <li>Strict STIX 2.1 Indicator pattern schema</li>
-                        <li>Includes hashes, URLs, C2 domains, and subnets</li>
-                        <li>Formatted with confidence scoring and validity timestamps</li>
+                    <ul class="text-secondary small ps-3 mb-3" style="line-height: 1.6;">
+                        <li>Conforms to official STIX 2.1 indicator patterns with hyphenated hash keys (<code>SHA-256</code>, <code>SHA-1</code>, <code>MD5</code>)</li>
+                        <li>Filters active, non-expired indicators and excludes credentials or internal tokens</li>
+                        <li>Equipped with UUID identifiers, validity timestamps, and confidence telemetry</li>
                     </ul>
                 </div>
-                <a href="/api/stix/export" class="btn btn-info text-dark fw-bold w-100 d-flex align-items-center justify-content-center gap-2">
-                    <i class="bi bi-download"></i>
-                    <span>Download STIX 2.1 Threat Bundle (.json)</span>
-                </a>
+                <div class="d-flex gap-2">
+                    <a href="/api/stix/export" class="btn btn-info text-dark fw-bold w-100 d-flex align-items-center justify-content-center gap-2">
+                        <i class="bi bi-download"></i>
+                        <span>Download STIX 2.1 Threat Bundle (.json)</span>
+                    </a>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Global Whitelist Policies -->
+<!-- Global Whitelist Suppression Policies Card -->
 <div class="card card-soc mt-4">
-    <div class="card-soc-header">
+    <div class="card-soc-header d-flex flex-wrap justify-content-between align-items-center gap-2">
         <div>
-            <h6 class="fw-bold mb-0 text-white"><i class="bi bi-shield-check text-success"></i> Global Whitelist Suppression Policies</h6>
-            <small class="text-muted" style="font-size: 0.75rem;">Whitelisted values are excluded from alert generation to prevent false alarms.</small>
+            <h6 class="fw-bold mb-0 text-white d-flex align-items-center gap-2">
+                <i class="bi bi-shield-check text-success"></i> Global Whitelist Suppression Policies
+            </h6>
+            <small class="text-muted" style="font-size: 0.75rem;">
+                Whitelisted indicators are evaluated during correlation to suppress false alarms. Original IOCs and log events remain strictly preserved.
+            </small>
         </div>
+        <span class="badge bg-dark border border-secondary text-secondary font-mono">
+            Active Rules: {{ whitelist_items|selectattr('status_label', 'equalto', 'ACTIVE')|list|length }}
+        </span>
     </div>
+
     <div class="p-3">
-        <form action="/settings/whitelist/add" method="POST" class="row g-2 mb-4">
-            <div class="col-md-2">
-                <select name="type" class="form-select form-select-sm bg-dark text-white border-secondary" required>
+        <!-- Add Whitelist Policy Form -->
+        <form action="/settings/whitelist/add" method="POST" class="row g-2 mb-4 p-3 rounded" style="background: rgba(31, 41, 55, 0.4); border: 1px solid var(--border-subtle);">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div class="col-12 mb-1">
+                <span class="text-info fw-semibold small"><i class="bi bi-plus-circle"></i> Create New Whitelist Suppression Policy</span>
+            </div>
+
+            <div class="col-12 col-md-2">
+                <label class="form-label text-muted small mb-1">Indicator Type</label>
+                <select name="type" id="policyTypeSelect" class="form-select form-select-sm bg-dark text-white border-secondary" required onchange="updatePlaceholder()">
                     <option value="ipv4">IPv4 Address</option>
+                    <option value="ipv6">IPv6 Address</option>
                     <option value="cidr">CIDR Subnet</option>
                     <option value="domain">Domain</option>
                     <option value="url">URL</option>
-                    <option value="hash">Hash</option>
-                    <option value="email">Email</option>
+                    <option value="sha256">SHA-256 Hash</option>
+                    <option value="sha1">SHA-1 Hash</option>
+                    <option value="md5">MD5 Hash</option>
                 </select>
             </div>
-            <div class="col-md-3">
-                <input type="text" name="value" class="form-control form-control-sm bg-dark text-white border-secondary font-mono" placeholder="e.g. 8.8.8.8 or 10.0.0.0/8" required>
+
+            <div class="col-12 col-md-3">
+                <label class="form-label text-muted small mb-1">Indicator Value</label>
+                <input type="text" name="value" id="policyValueInput" class="form-control form-control-sm bg-dark text-white border-secondary font-mono" placeholder="e.g. 192.168.1.10" required>
             </div>
-            <div class="col-md-3">
-                <input type="text" name="description" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Description (e.g. Internal Gateway)">
+
+            <div class="col-12 col-md-2">
+                <label class="form-label text-muted small mb-1">Description</label>
+                <input type="text" name="description" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. Internal Domain Controller" required minlength="3">
             </div>
-            <div class="col-md-2">
-                <input type="text" name="reason" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Justification">
+
+            <div class="col-12 col-md-2">
+                <label class="form-label text-muted small mb-1">Justification</label>
+                <input type="text" name="reason" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. Approved auth server" required minlength="3">
             </div>
-            <div class="col-md-2">
-                <button type="submit" class="btn btn-sm btn-success w-100">
-                    <i class="bi bi-plus-lg"></i> Add Policy
+
+            <div class="col-12 col-md-2">
+                <label class="form-label text-muted small mb-1">Expiration</label>
+                <select name="expires_in" class="form-select form-select-sm bg-dark text-white border-secondary">
+                    <option value="never">Permanent</option>
+                    <option value="1">1 Day</option>
+                    <option value="7">7 Days</option>
+                    <option value="30">30 Days</option>
+                    <option value="90">90 Days</option>
+                </select>
+            </div>
+
+            <div class="col-12 col-md-1 d-flex align-items-end">
+                <button type="submit" class="btn btn-sm btn-success w-100" title="Add Suppression Policy">
+                    <i class="bi bi-plus-lg"></i> Add
                 </button>
             </div>
         </form>
 
+        <!-- Whitelist Policies Ledger Table -->
         <div class="table-responsive">
-            <table class="table table-soc align-middle mb-0">
+            <table class="table table-soc align-middle mb-0" style="min-width: 1000px;">
                 <thead>
                     <tr>
-                        <th style="width: 110px;">Type</th>
-                        <th>Whitelisted Value</th>
-                        <th>Description</th>
-                        <th>Justification</th>
-                        <th style="width: 80px;" class="text-end">Action</th>
+                        <th style="width: 100px;">Type</th>
+                        <th style="width: 240px;">Whitelisted Indicator</th>
+                        <th style="width: 200px;">Description</th>
+                        <th style="width: 180px;">Justification</th>
+                        <th style="width: 110px;">Status</th>
+                        <th style="width: 150px;">Expiration</th>
+                        <th style="width: 110px;">Created By</th>
+                        <th style="width: 130px;" class="text-end">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for entry in whitelist %}
+                    {% for item in whitelist_items %}
                     <tr>
-                        <td><span class="badge bg-secondary font-mono">{{ entry.type|upper }}</span></td>
-                        <td class="font-mono text-white">{{ entry.value }}</td>
-                        <td class="text-muted small">{{ entry.description or 'No description' }}</td>
-                        <td class="text-info small font-mono">{{ entry.reason or '--' }}</td>
+                        <td>
+                            <span class="badge bg-secondary font-mono">{{ item.type|upper }}</span>
+                        </td>
+                        <td class="font-mono text-white text-truncate" style="max-width: 240px;" title="{{ item.value }}">
+                            {{ item.value }}
+                        </td>
+                        <td class="text-secondary small text-truncate" style="max-width: 200px;" title="{{ item.description }}">
+                            {{ item.description or '--' }}
+                        </td>
+                        <td class="text-info small text-truncate" style="max-width: 180px;" title="{{ item.reason }}">
+                            {{ item.reason or '--' }}
+                        </td>
+                        <td>
+                            <span class="badge {{ item.badge_class }} font-mono">{{ item.status_label }}</span>
+                        </td>
+                        <td class="small font-mono text-muted">
+                            {{ item.expires_display }}
+                        </td>
+                        <td class="small text-muted font-mono">
+                            {{ item.created_by }}
+                        </td>
                         <td class="text-end">
-                            <form action="/settings/whitelist/remove/{{ entry.id }}" method="POST" style="display:inline;">
-                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Remove Rule">
+                            <div class="d-inline-flex align-items-center gap-1">
+                                <!-- Toggle Active / Disabled -->
+                                <form action="/settings/whitelist/{{ item.id }}/toggle" method="POST" style="display:inline;">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                    <button type="submit" class="btn btn-sm {% if item.is_active %}btn-outline-success{% else %}btn-outline-secondary{% endif %}" title="{% if item.is_active %}Deactivate Policy{% else %}Activate Policy{% endif %}" style="padding: 2px 6px;">
+                                        <i class="bi {% if item.is_active %}bi-toggle-on{% else %}bi-toggle-off{% endif %} fs-6"></i>
+                                    </button>
+                                </form>
+
+                                <!-- Edit Policy Trigger -->
+                                <button type="button" class="btn btn-sm btn-outline-info" title="Edit Policy" style="padding: 2px 6px;" onclick="openEditModal('{{ item.id }}', '{{ item.type }}', '{{ item.value }}', '{{ item.description }}', '{{ item.reason }}', '{{ item.expires_display }}')">
+                                    <i class="bi bi-pencil-square"></i>
+                                </button>
+
+                                <!-- Delete Policy Safe Modal Trigger -->
+                                <button type="button" class="btn btn-sm btn-outline-danger" title="Delete Policy" style="padding: 2px 6px;" onclick="openDeleteModal('{{ item.id }}', '{{ item.type }}', '{{ item.value }}')">
                                     <i class="bi bi-trash"></i>
                                 </button>
-                            </form>
+                            </div>
                         </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="4" class="text-center py-3 text-muted">
-                            No active whitelist suppression policies. Add internal infrastructure above to suppress benign alerts.
+                        <td colspan="8" class="text-center py-4 text-muted">
+                            <i class="bi bi-shield-slash fs-4 d-block mb-1"></i>
+                            No whitelist suppression policies configured. Add internal hosts or verified false positives above.
                         </td>
                     </tr>
                     {% endfor %}
@@ -145,27 +266,132 @@
         </div>
     </div>
 </div>
+
+<!-- Edit Whitelist Policy Modal -->
+<div class="modal fade" id="editPolicyModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark border-secondary text-white">
+            <div class="modal-header border-secondary">
+                <h6 class="modal-title fw-bold">
+                    <i class="bi bi-pencil-square text-info"></i> Edit Whitelist Suppression Policy
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="editPolicyForm" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label small text-muted">Target Indicator:</label>
+                        <input type="text" id="editModalIndicator" class="form-control form-control-sm bg-dark text-muted border-secondary font-mono" readonly>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small text-muted">Description (Required):</label>
+                        <input type="text" name="description" id="editModalDescription" class="form-control form-control-sm bg-dark text-white border-secondary" required minlength="3">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small text-muted">Justification / Reason (Required):</label>
+                        <input type="text" name="reason" id="editModalReason" class="form-control form-control-sm bg-dark text-white border-secondary" required minlength="3">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small text-muted">Update Expiration:</label>
+                        <select name="expires_in" id="editModalExpires" class="form-select form-select-sm bg-dark text-white border-secondary">
+                            <option value="keep" selected>Keep Current Expiration</option>
+                            <option value="never">Permanent (No Expiry)</option>
+                            <option value="1">1 Day from Now</option>
+                            <option value="7">7 Days from Now</option>
+                            <option value="30">30 Days from Now</option>
+                            <option value="90">90 Days from Now</option>
+                        </select>
+                        <small class="text-muted d-block mt-1" id="editModalCurrentExpHelp"></small>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-sm btn-info text-dark fw-bold">
+                        <i class="bi bi-check-lg"></i> Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Safe Delete Whitelist Policy Modal -->
+<div class="modal fade" id="deletePolicyModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark border-danger text-white">
+            <div class="modal-header border-secondary bg-danger bg-opacity-10">
+                <h6 class="modal-title fw-bold text-danger">
+                    <i class="bi bi-exclamation-triangle-fill"></i> Confirm Policy Removal
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-white small mb-2">
+                    Are you sure you want to remove Whitelist Policy <strong id="deleteModalPolicyId" class="text-info font-mono">#--</strong>?
+                </p>
+                <div class="p-2 mb-3 rounded bg-black border border-secondary">
+                    <span class="badge bg-secondary font-mono me-1" id="deleteModalType">TYPE</span>
+                    <span class="font-mono text-warning" id="deleteModalIndicator">--</span>
+                </div>
+                <div class="alert alert-warning py-2 px-3 small border-0 mb-0" style="background: rgba(245, 158, 11, 0.15); color: #FBBF24;">
+                    <i class="bi bi-info-circle-fill me-1"></i>
+                    <strong>Impact Notice:</strong> Removing this policy will immediately restore alert generation for this indicator. Original IOC intelligence and historical raw log events remain safely preserved.
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form id="deletePolicyForm" method="POST" style="display:inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button type="submit" class="btn btn-sm btn-danger fw-bold">
+                        <i class="bi bi-trash-fill"></i> Delete Policy
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
+function updatePlaceholder() {
+    const sel = document.getElementById('policyTypeSelect');
+    const input = document.getElementById('policyValueInput');
+    const val = sel.value;
+    if (val === 'ipv4') input.placeholder = 'e.g. 192.168.1.50';
+    else if (val === 'ipv6') input.placeholder = 'e.g. 2001:db8::1';
+    else if (val === 'cidr') input.placeholder = 'e.g. 10.0.0.0/16 or 192.168.1.0/24';
+    else if (val === 'domain') input.placeholder = 'e.g. internal.corp.net or update.microsoft.com';
+    else if (val === 'url') input.placeholder = 'e.g. https://auth.corp.net/health';
+    else if (val === 'sha256') input.placeholder = 'e.g. e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
+    else if (val === 'sha1') input.placeholder = 'e.g. da39a3ee5e6b4b0d3255bfef95601890afd80709';
+    else if (val === 'md5') input.placeholder = 'e.g. d41d8cd98f00b204e9800998ecf8427e';
+}
+
 function testCurrentWebhook() {
-    const input = document.querySelector('input[name="webhook_url"]');
+    const input = document.getElementById('webhookUrlInput');
     const msg = document.getElementById('webhookTestMsg');
     msg.style.display = 'block';
     msg.className = 'small mt-2 text-info';
-    msg.textContent = 'Sending test notification...';
+    msg.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span> Validating URL & dispatching test payload...';
 
     fetch('/api/webhook/test', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': '{{ csrf_token }}'
+        },
         body: JSON.stringify({ url: input.value })
     })
     .then(r => r.json())
     .then(data => {
         if (data.success) {
             msg.className = 'small mt-2 text-success fw-bold';
-            msg.textContent = '✓ Test webhook notification sent successfully!';
+            msg.textContent = '✓ ' + data.message;
         } else {
             msg.className = 'small mt-2 text-warning';
             msg.textContent = 'Notice: ' + data.message;
@@ -175,6 +401,27 @@ function testCurrentWebhook() {
         msg.className = 'small mt-2 text-danger';
         msg.textContent = 'Failed to dispatch test notification.';
     });
+}
+
+function openEditModal(id, type, value, description, reason, expiresDisplay) {
+    document.getElementById('editPolicyForm').action = `/settings/whitelist/${id}/edit`;
+    document.getElementById('editModalIndicator').value = `[${type.toUpperCase()}] ${value}`;
+    document.getElementById('editModalDescription').value = description || '';
+    document.getElementById('editModalReason').value = reason || '';
+    document.getElementById('editModalCurrentExpHelp').textContent = `Current Expiration: ${expiresDisplay}`;
+    
+    const modal = new bootstrap.Modal(document.getElementById('editPolicyModal'));
+    modal.show();
+}
+
+function openDeleteModal(id, type, value) {
+    document.getElementById('deletePolicyForm').action = `/settings/whitelist/${id}/delete`;
+    document.getElementById('deleteModalPolicyId').textContent = `#${id}`;
+    document.getElementById('deleteModalType').textContent = type.toUpperCase();
+    document.getElementById('deleteModalIndicator').textContent = value;
+
+    const modal = new bootstrap.Modal(document.getElementById('deletePolicyModal'));
+    modal.show();
 }
 </script>
 {% endblock %}

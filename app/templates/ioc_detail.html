@@ -4,7 +4,7 @@
 
 {% block content %}
 <div class="mb-4">
-    <a href="/iocs" class="btn btn-sm btn-outline-secondary mb-3">
+    <a href="{{ return_to or '/iocs' }}" class="btn btn-sm btn-outline-secondary mb-3">
         <i class="bi bi-arrow-left me-1"></i> Back to Repository
     </a>
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
@@ -20,6 +20,9 @@
             <h3 class="fw-bold font-mono text-white mb-0 text-break">{{ ioc.value }}</h3>
         </div>
         <form action="/iocs/{{ ioc.id }}/toggle" method="POST">
+            {% if return_to %}
+            <input type="hidden" name="return_to" value="{{ return_to }}">
+            {% endif %}
             {% if ioc.is_active %}
             <button class="btn btn-sm btn-outline-danger">
                 <i class="bi bi-pause-circle me-1"></i> Deactivate Indicator

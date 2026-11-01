@@ -1,57 +1,202 @@
 {% extends "base.html" %}
 
-{% block title %}SENTINEL // SOC Audit Trails{% endblock %}
+{% block title %}SOC Operational Audit Trails - SENTINEL CTI{% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-center justify-content-between mb-4">
+<!-- Page Header -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
     <div>
-        <h3 class="fw-bold mb-1"><i class="bi bi-journal-text text-info me-2"></i>SOC Operational Audit Trails</h3>
-        <p class="text-secondary small mb-0">Immutable records of analyst activities, triage decisions, and system events.</p>
+        <h3 class="fw-bold mb-1 text-white">
+            <i class="bi bi-journal-text text-info me-2"></i>SOC Operational Audit Trails
+        </h3>
+        <p class="text-secondary small mb-0">Immutable records of analyst activities, triage decisions, settings modifications, and system events.</p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <span class="badge bg-dark border border-secondary text-info px-3 py-2 font-mono">
+            <i class="bi bi-shield-check me-1"></i>{{ total_records|default(audit_logs|length) }} Total Matching Records
+        </span>
     </div>
 </div>
 
-<div class="card card-soc">
-    <div class="card-soc-header d-flex align-items-center justify-content-between">
-        <span class="fw-semibold small text-uppercase" style="letter-spacing: 0.05em;">Security Audit Log (Last 200 Entries)</span>
+<!-- Search and Filter Panel -->
+<div class="card card-soc mb-4" style="border-left: 3px solid var(--accent-cyan);">
+    <div class="card-soc-header d-flex align-items-center justify-content-between py-2 px-3">
+        <span class="fw-semibold text-white small text-uppercase" style="letter-spacing: 0.05em;">
+            <i class="bi bi-funnel me-1 text-info"></i>Audit Query & Historical Filtering
+        </span>
+        {% if active_filters_count|default(0) > 0 %}
+        <span class="badge bg-info text-dark font-mono" style="font-size: 0.72rem;">
+            <i class="bi bi-check2-circle"></i> {{ active_filters_count }} Filter(s) Applied
+        </span>
+        {% else %}
+        <span class="badge bg-dark border border-secondary text-muted font-mono" style="font-size: 0.72rem;">
+            Full Audit Ledger
+        </span>
+        {% endif %}
     </div>
-    <div class="table-responsive">
-        <table class="table table-soc mb-0">
+    <div class="p-3">
+        <form method="GET" action="/audit-logs" id="auditFilterForm">
+            <!-- Row 1: Search, User, Action, Client IP, Page Size -->
+            <div class="row g-2 mb-2">
+                <div class="col-12 col-md-4 col-lg-3">
+                    <label class="form-label small text-secondary mb-1">Search Audit Trails:</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-dark border-secondary text-secondary">
+                            <i class="bi bi-search"></i>
+                        </span>
+                        <input type="text" name="q" class="form-control form-control-sm bg-dark border-secondary text-white font-mono" placeholder="Action, details, IP, indicator, #ID..." value="{{ current_filters.q }}" autocomplete="off">
+                    </div>
+                </div>
+                <div class="col-6 col-md-3 col-lg-2">
+                    <label class="form-label small text-secondary mb-1">User / Operator:</label>
+                    <select name="user" class="form-select form-select-sm bg-dark border-secondary text-white font-mono">
+                        <option value="">All Users</option>
+                        {% for u in available_users %}
+                        <option value="{{ u }}" {% if current_filters.user == u %}selected{% endif %}>{{ u }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-6 col-md-3 col-lg-3">
+                    <label class="form-label small text-secondary mb-1">Audit Action:</label>
+                    <select name="action" class="form-select form-select-sm bg-dark border-secondary text-white font-mono">
+                        <option value="">All Actions</option>
+                        {% for a in available_actions %}
+                        <option value="{{ a }}" {% if current_filters.action == a %}selected{% endif %}>{{ a }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-6 col-md-2 col-lg-2">
+                    <label class="form-label small text-secondary mb-1">Client IP:</label>
+                    <input type="text" name="client_ip" class="form-control form-control-sm bg-dark border-secondary text-white font-mono" placeholder="127.0.0.1" value="{{ current_filters.client_ip }}" autocomplete="off">
+                </div>
+                <div class="col-6 col-md-2 col-lg-2">
+                    <label class="form-label small text-secondary mb-1">Records Per Page:</label>
+                    <select name="per_page" class="form-select form-select-sm bg-dark border-secondary text-white font-mono" onchange="this.form.submit()">
+                        <option value="25" {% if current_filters.per_page == 25 %}selected{% endif %}>25 per page</option>
+                        <option value="50" {% if current_filters.per_page == 50 %}selected{% endif %}>50 per page</option>
+                        <option value="100" {% if current_filters.per_page == 100 %}selected{% endif %}>100 per page</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Row 2: Date Range and Actions -->
+            <div class="row g-2 align-items-end">
+                <div class="col-6 col-md-3 col-lg-3">
+                    <label class="form-label small text-secondary mb-1">Start Date (UTC):</label>
+                    <input type="date" name="start_date" class="form-control form-control-sm bg-dark border-secondary text-white font-mono" value="{{ current_filters.start_date }}">
+                </div>
+                <div class="col-6 col-md-3 col-lg-3">
+                    <label class="form-label small text-secondary mb-1">End Date (UTC):</label>
+                    <input type="date" name="end_date" class="form-control form-control-sm bg-dark border-secondary text-white font-mono" value="{{ current_filters.end_date }}">
+                </div>
+                <div class="col-12 col-md-6 col-lg-6 d-flex justify-content-end gap-2 pt-2 pt-md-0">
+                    <a href="/audit-logs" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1" title="Reset all search filters">
+                        <i class="bi bi-arrow-clockwise"></i>
+                        <span>Reset</span>
+                    </a>
+                    <button type="submit" class="btn btn-sm btn-info text-dark fw-semibold d-flex align-items-center gap-1">
+                        <i class="bi bi-funnel-fill"></i>
+                        <span>Apply Filters</span>
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Pagination & Results Status Header -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2 px-1">
+    <div class="d-flex align-items-center gap-2">
+        <span class="text-secondary small">
+            Showing records 
+            <strong class="text-white">{{ (current_page|default(1) - 1) * per_page|default(25) + 1 if total_records|default(0) > 0 else 0 }}</strong> 
+            to 
+            <strong class="text-white">{{ [current_page|default(1) * per_page|default(25), total_records|default(0)]|min }}</strong> 
+            of 
+            <strong class="text-white">{{ total_records|default(audit_logs|length) }}</strong> matching entries
+            (Page {{ current_page|default(1) }} of {{ total_pages|default(1) }})
+        </span>
+    </div>
+
+    <!-- Top Pagination Controls -->
+    {% if total_pages|default(1) > 1 %}
+    <nav aria-label="Audit Log Top Pagination">
+        <ul class="pagination pagination-sm mb-0">
+            <li class="page-item {% if current_page <= 1 or not prev_page_url %}disabled{% endif %}">
+                <a class="page-link bg-dark border-secondary text-white font-mono" href="{{ prev_page_url or '#' }}" {% if current_page <= 1 %}tabindex="-1" aria-disabled="true"{% endif %}>
+                    <i class="bi bi-chevron-left"></i> Prev
+                </a>
+            </li>
+            {% for p in page_numbers %}
+            <li class="page-item {% if p.is_current %}active{% endif %}">
+                <a class="page-link {% if p.is_current %}bg-info text-dark border-info fw-bold{% else %}bg-dark border-secondary text-white{% endif %} font-mono" href="{{ p.url }}">
+                    {{ p.num }}
+                </a>
+            </li>
+            {% endfor %}
+            <li class="page-item {% if current_page >= total_pages or not next_page_url %}disabled{% endif %}">
+                <a class="page-link bg-dark border-secondary text-white font-mono" href="{{ next_page_url or '#' }}" {% if current_page >= total_pages %}tabindex="-1" aria-disabled="true"{% endif %}>
+                    Next <i class="bi bi-chevron-right"></i>
+                </a>
+            </li>
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+
+<!-- Immutable Audit Table -->
+<div class="card card-soc mb-4">
+    <div class="table-responsive" style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
+        <table class="table table-soc align-middle mb-0" style="table-layout: fixed; min-width: 980px; width: 100%;">
             <thead>
-                <tr>
-                    <th style="width: 80px;">ID</th>
-                    <th style="width: 170px;">Timestamp</th>
-                    <th>User</th>
-                    <th>Action</th>
-                    <th>Event Details</th>
-                    <th>Client IP</th>
+                <tr class="text-muted text-uppercase" style="font-size: 0.72rem; letter-spacing: 0.06em;">
+                    <th style="width: 80px; white-space: nowrap;">ID</th>
+                    <th style="width: 180px; white-space: nowrap;">Timestamp</th>
+                    <th style="width: 120px; white-space: nowrap;">User</th>
+                    <th style="width: 200px; white-space: nowrap;">Action</th>
+                    <th style="min-width: 280px;">Event Details</th>
+                    <th style="width: 130px; white-space: nowrap;">Client IP</th>
                 </tr>
             </thead>
             <tbody>
                 {% for log in audit_logs %}
                 <tr>
-                    <td class="font-mono text-muted">#{{ log.id }}</td>
-                    <td class="font-mono text-muted small">
-                        {{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') if log.timestamp else '--' }}
+                    <td class="font-mono text-muted text-nowrap" style="font-size: 0.8rem;">
+                        #{{ log.id }}
+                    </td>
+                    <td class="font-mono text-muted small text-nowrap">
+                        <i class="bi bi-clock me-1"></i>{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') if log.timestamp else '--' }}
                     </td>
                     <td>
-                        <span class="badge bg-secondary font-mono">{{ log.user }}</span>
+                        <span class="badge {% if log.user == 'system' %}bg-dark text-muted border border-secondary{% else %}bg-secondary text-light{% endif %} font-mono">
+                            <i class="bi bi-person-fill me-1"></i>{{ log.user }}
+                        </span>
                     </td>
                     <td>
-                        <span class="badge {% if 'failed' in log.action or 'blocked' in log.action %}bg-danger{% elif 'created' in log.action or 'add' in log.action %}bg-success{% elif 'update' in log.action %}bg-info text-dark{% else %}bg-dark border border-secondary{% endif %} font-mono">
+                        <span class="badge {% if 'failed' in log.action or 'blocked' in log.action or 'deleted' in log.action or 'deactivated' in log.action %}bg-danger text-light{% elif 'created' in log.action or 'add' in log.action or 'restored' in log.action or 'success' in log.action %}bg-success text-light{% elif 'updated' in log.action or 'edit' in log.action or 'status' in log.action %}bg-info text-dark{% else %}bg-dark border border-secondary text-light{% endif %} font-mono text-truncate d-inline-block" style="max-width: 185px;" title="{{ log.action }}">
                             {{ log.action }}
                         </span>
                     </td>
-                    <td class="font-mono text-white small text-break">
-                        {{ log.details or '--' }}
+                    <td>
+                        <div class="font-mono text-white small" style="word-break: break-word; white-space: normal; line-height: 1.45;">
+                            {{ log.details }}
+                        </div>
                     </td>
-                    <td class="font-mono text-muted small">
-                        {{ log.ip_address or '127.0.0.1' }}
+                    <td class="font-mono text-muted small text-nowrap">
+                        <i class="bi bi-laptop me-1"></i>{{ log.ip_address }}
                     </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="6" class="text-center py-4 text-muted">
-                        No audit events recorded yet.
+                    <td colspan="6" class="text-center py-5 text-muted">
+                        <div class="d-flex flex-column align-items-center justify-content-center">
+                            <i class="bi bi-search fs-2 text-secondary mb-2"></i>
+                            <span class="fw-semibold text-white mb-1">No matching audit records found</span>
+                            <span class="small text-muted mb-3">Adjust your search parameters, date range, or active filters.</span>
+                            <a href="/audit-logs" class="btn btn-sm btn-outline-info">
+                                <i class="bi bi-arrow-clockwise me-1"></i>Clear All Filters
+                            </a>
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}
@@ -59,5 +204,35 @@
         </table>
     </div>
 </div>
-{% endblock %}
 
+<!-- Bottom Pagination Controls -->
+{% if total_pages|default(1) > 1 %}
+<div class="d-flex align-items-center justify-content-between px-1 mb-4">
+    <span class="text-muted small">
+        Page <strong class="text-white">{{ current_page|default(1) }}</strong> of <strong class="text-white">{{ total_pages|default(1) }}</strong>
+    </span>
+    <nav aria-label="Audit Log Bottom Pagination">
+        <ul class="pagination pagination-sm mb-0">
+            <li class="page-item {% if current_page <= 1 or not prev_page_url %}disabled{% endif %}">
+                <a class="page-link bg-dark border-secondary text-white font-mono" href="{{ prev_page_url or '#' }}" {% if current_page <= 1 %}tabindex="-1" aria-disabled="true"{% endif %}>
+                    <i class="bi bi-chevron-left"></i> Prev
+                </a>
+            </li>
+            {% for p in page_numbers %}
+            <li class="page-item {% if p.is_current %}active{% endif %}">
+                <a class="page-link {% if p.is_current %}bg-info text-dark border-info fw-bold{% else %}bg-dark border-secondary text-white{% endif %} font-mono" href="{{ p.url }}">
+                    {{ p.num }}
+                </a>
+            </li>
+            {% endfor %}
+            <li class="page-item {% if current_page >= total_pages or not next_page_url %}disabled{% endif %}">
+                <a class="page-link bg-dark border-secondary text-white font-mono" href="{{ next_page_url or '#' }}" {% if current_page >= total_pages %}tabindex="-1" aria-disabled="true"{% endif %}>
+                    Next <i class="bi bi-chevron-right"></i>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</div>
+{% endif %}
+
+{% endblock %}

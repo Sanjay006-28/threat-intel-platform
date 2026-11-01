@@ -1,47 +1,245 @@
 {% extends "base.html" %}
-{% block title %}Feeds - Threat Intel Platform{% endblock %}
+
+{% block title %}SENTINEL // Threat Feed Hub & Ingestion Connectors{% endblock %}
+
 {% block content %}
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h2>Threat Intel Feeds</h2>
-    <form action="/feeds/run_all" method="post">
-        <button type="submit" class="btn btn-primary">Fetch Now</button>
-    </form>
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
+    <div>
+        <h3 class="fw-bold mb-1"><i class="bi bi-rss text-info me-2"></i>Threat Feed Connectors</h3>
+        <p class="text-secondary small mb-0">Automated threat intelligence feed synchronization engine, polling schedules, and ingestion ledger.</p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <a href="/feeds" class="btn btn-sm btn-outline-secondary" title="Refresh Feed Ledger">
+            <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+        </a>
+        <form action="/feeds/run_all" method="POST" class="d-inline">
+            <button type="submit" class="btn btn-sm btn-primary" {% if is_global_syncing %}disabled{% endif %}>
+                <i class="bi bi-arrow-repeat me-1"></i> Sync All Feeds
+            </button>
+        </form>
+    </div>
 </div>
 
-<h4>Configured Feeds</h4>
-<table class="table table-striped">
-    <thead>
-        <tr><th>Name</th><th>Type</th><th>Enabled</th><th>Last Run Status</th><th>Last Run At</th></tr>
-    </thead>
-    <tbody>
-        {% for feed in feeds %}
-        <tr>
-            <td>{{ feed.name }}</td>
-            <td>{{ feed.type }}</td>
-            <td>{{ feed.enabled }}</td>
-            <td>{{ feed.last_run_status }}</td>
-            <td>{{ feed.last_run_at }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+<!-- Flash Notification Banner -->
+{% if msg %}
+<div class="alert alert-{{ msg_type }} alert-dismissible fade show border-0 shadow-sm mb-4 bg-opacity-25" role="alert">
+    <div class="d-flex align-items-center">
+        {% if msg_type == 'success' %}
+        <i class="bi bi-check-circle-fill fs-5 text-success me-2"></i>
+        {% elif msg_type == 'warning' %}
+        <i class="bi bi-exclamation-triangle-fill fs-5 text-warning me-2"></i>
+        {% elif msg_type == 'danger' %}
+        <i class="bi bi-x-circle-fill fs-5 text-danger me-2"></i>
+        {% else %}
+        <i class="bi bi-info-circle-fill fs-5 text-info me-2"></i>
+        {% endif %}
+        <div>{{ msg }}</div>
+    </div>
+    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+{% endif %}
 
-<h4 class="mt-4">Recent Runs</h4>
-<table class="table table-sm">
-    <thead>
-        <tr><th>Feed ID</th><th>Status</th><th>Start Time</th><th>End Time</th><th>Records Fetched</th><th>New</th></tr>
-    </thead>
-    <tbody>
-        {% for run in runs %}
-        <tr>
-            <td>{{ run.feed_id }}</td>
-            <td>{{ run.status }}</td>
-            <td>{{ run.start_time }}</td>
-            <td>{{ run.end_time }}</td>
-            <td>{{ run.records_fetched }}</td>
-            <td>{{ run.new_records }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+<!-- Feed Status Summary KPIs -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card card-soc p-3">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <span class="text-secondary small text-uppercase">Configured Connectors</span>
+                    <h3 class="fw-bold font-mono text-white mb-0 mt-1">{{ operational_count }}</h3>
+                    <span class="text-success small font-mono"><i class="bi bi-check-circle me-1"></i>Active & Polling</span>
+                </div>
+                <div class="rounded-circle bg-success bg-opacity-10 p-3 text-success">
+                    <i class="bi bi-broadcast fs-3"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card card-soc p-3">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <span class="text-secondary small text-uppercase">Optional / Unconfigured</span>
+                    <h3 class="fw-bold font-mono text-white mb-0 mt-1">{{ unconfigured_count }}</h3>
+                    <span class="text-muted small font-mono"><i class="bi bi-slash-circle me-1"></i>AlienVault OTX</span>
+                </div>
+                <div class="rounded-circle bg-secondary bg-opacity-10 p-3 text-secondary">
+                    <i class="bi bi-shield-slash fs-3"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card card-soc p-3">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <span class="text-secondary small text-uppercase">Sync History Runs</span>
+                    <h3 class="fw-bold font-mono text-white mb-0 mt-1">{{ total_runs_count }}</h3>
+                    <span class="text-info small font-mono"><i class="bi bi-clock-history me-1"></i>Tracked Executions</span>
+                </div>
+                <div class="rounded-circle bg-info bg-opacity-10 p-3 text-info">
+                    <i class="bi bi-journal-text fs-3"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card card-soc p-3">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <span class="text-secondary small text-uppercase">Scheduler Frequency</span>
+                    <h3 class="fw-bold font-mono text-white mb-0 mt-1">6h</h3>
+                    <span class="text-info small font-mono"><i class="bi bi-arrow-repeat me-1"></i>Every 360 mins</span>
+                </div>
+                <div class="rounded-circle bg-primary bg-opacity-10 p-3 text-primary">
+                    <i class="bi bi-stopwatch fs-3"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 1. Configured Feeds Table -->
+<div class="card card-soc mb-4">
+    <div class="card-soc-header d-flex align-items-center justify-content-between">
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-hdd-network text-info"></i>
+            <span class="fw-semibold small text-uppercase">Configured Threat Intelligence Connectors</span>
+        </div>
+        <span class="badge bg-dark border border-secondary text-secondary font-mono small">{{ feeds|length }} Connectors Loaded</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-soc align-middle mb-0">
+            <thead>
+                <tr>
+                    <th style="width: 16%;">Feed Name</th>
+                    <th style="width: 10%;">Connector Type</th>
+                    <th style="width: 10%;">Enabled</th>
+                    <th style="width: 22%;">Configuration Status</th>
+                    <th style="width: 12%;">Last Run Status</th>
+                    <th style="width: 15%;">Last Successful Sync</th>
+                    <th style="width: 15%;">Last Run Time</th>
+                    <th style="width: 10%; text-align: center;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for feed in feeds %}
+                <tr>
+                    <td>
+                        <span class="fw-semibold font-mono text-white">{{ feed.name }}</span>
+                    </td>
+                    <td>
+                        <span class="badge bg-dark border border-secondary font-mono text-muted">{{ feed.type }}</span>
+                    </td>
+                    <td>
+                        <span class="badge {{ feed.enabled_badge }} font-mono">{{ feed.enabled_display }}</span>
+                    </td>
+                    <td>
+                        <span class="badge {{ feed.config_badge }} font-mono">{{ feed.config_status }}</span>
+                    </td>
+                    <td>
+                        <span class="badge {{ feed.last_run_badge }} font-mono">{{ feed.last_run_display }}</span>
+                    </td>
+                    <td>
+                        <span class="font-mono small text-secondary">{{ feed.last_successful_sync_str }}</span>
+                    </td>
+                    <td>
+                        <span class="font-mono small text-secondary">{{ feed.last_run_at_str }}</span>
+                    </td>
+                    <td class="text-center">
+                        {% if feed.can_sync %}
+                        <form action="/feeds/{{ feed.id }}/sync" method="POST" class="d-inline">
+                            <button type="submit" class="btn btn-xs btn-outline-info" title="Synchronize {{ feed.name }}" {% if feed.is_syncing %}disabled{% endif %}>
+                                <i class="bi bi-arrow-repeat me-1"></i>Sync
+                            </button>
+                        </form>
+                        {% else %}
+                        <button class="btn btn-xs btn-outline-secondary" disabled title="Optional feed unconfigured (OTX_API_KEY missing in .env)">
+                            <i class="bi bi-slash-circle me-1"></i>Unconfigured
+                        </button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" class="text-center py-4 text-muted">
+                        No threat intelligence feeds currently registered.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- 2. Recent Runs Table -->
+<div class="card card-soc mb-4">
+    <div class="card-soc-header d-flex align-items-center justify-content-between">
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-clock-history text-info"></i>
+            <span class="fw-semibold small text-uppercase">Recent Feed Synchronization Runs</span>
+        </div>
+        <span class="badge bg-dark border border-secondary text-secondary font-mono small">Showing Last {{ runs|length }} Executions</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-soc align-middle mb-0">
+            <thead>
+                <tr>
+                    <th style="width: 5%;">Run</th>
+                    <th style="width: 14%;">Feed Name</th>
+                    <th style="width: 10%;">Run Status</th>
+                    <th style="width: 14%;">Start Time (UTC)</th>
+                    <th style="width: 14%;">End Time (UTC)</th>
+                    <th style="width: 8%;">Duration</th>
+                    <th style="width: 7%; text-align: right;">Fetched</th>
+                    <th style="width: 7%; text-align: right;">New</th>
+                    <th style="width: 7%; text-align: right;">Updated</th>
+                    <th style="width: 7%; text-align: right;">Duplicates</th>
+                    <th style="width: 17%;">Error Details / Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for run in runs %}
+                <tr>
+                    <td class="font-mono text-muted small">#{{ run.id }}</td>
+                    <td>
+                        <span class="fw-semibold font-mono text-white">{{ run.feed_name }}</span>
+                    </td>
+                    <td>
+                        <span class="badge {{ run.badge_class }} font-mono">{{ run.status }}</span>
+                    </td>
+                    <td>
+                        <span class="font-mono small text-secondary">{{ run.start_time_str }}</span>
+                    </td>
+                    <td>
+                        <span class="font-mono small text-secondary">{{ run.end_time_str }}</span>
+                    </td>
+                    <td>
+                        <span class="badge bg-dark border border-secondary font-mono small text-info">{{ run.duration_str }}</span>
+                    </td>
+                    <td class="text-end font-mono small text-white">{{ run.records_fetched }}</td>
+                    <td class="text-end font-mono small text-success">{{ run.new_records }}</td>
+                    <td class="text-end font-mono small text-info">{{ run.updated_records }}</td>
+                    <td class="text-end font-mono small text-muted">{{ run.duplicate_records }}</td>
+                    <td>
+                        {% if run.error_message %}
+                        <span class="text-danger small font-mono" title="{{ run.error_message }}">
+                            <i class="bi bi-exclamation-circle me-1"></i>{{ run.error_message }}
+                        </span>
+                        {% else %}
+                        <span class="text-muted small font-mono">--</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="11" class="text-center py-4 text-muted">
+                        No recent synchronization runs recorded.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
 {% endblock %}

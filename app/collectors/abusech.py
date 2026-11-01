@@ -1,8 +1,11 @@
 import csv
 import json
+import logging
 import requests
 from typing import List, Dict, Any
 from app.collectors.base import BaseCollector
+
+logger = logging.getLogger(__name__)
 
 class ThreatFoxCollector(BaseCollector):
     def __init__(self):
@@ -26,8 +29,8 @@ class ThreatFoxCollector(BaseCollector):
                         })
             return records
         except Exception as e:
-            print(f"[!] ThreatFox fetch failed: {e}")
-            return []
+            logger.error(f"[!] ThreatFox fetch failed: {e}")
+            raise
 
 class URLhausCollector(BaseCollector):
     def __init__(self):
@@ -51,8 +54,8 @@ class URLhausCollector(BaseCollector):
                     })
             return records
         except Exception as e:
-            print(f"[!] URLhaus fetch failed: {e}")
-            return []
+            logger.error(f"[!] URLhaus fetch failed: {e}")
+            raise
 
 class FeodoTrackerCollector(BaseCollector):
     def __init__(self):
@@ -73,8 +76,8 @@ class FeodoTrackerCollector(BaseCollector):
                 })
             return records
         except Exception as e:
-            print(f"[!] FeodoTracker fetch failed: {e}")
-            return []
+            logger.error(f"[!] FeodoTracker fetch failed: {e}")
+            raise
 
 class MalwareBazaarCollector(BaseCollector):
     def __init__(self):
@@ -98,5 +101,5 @@ class MalwareBazaarCollector(BaseCollector):
                     })
             return records
         except Exception as e:
-            print(f"[!] MalwareBazaar fetch failed: {e}")
-            return []
+            logger.error(f"[!] MalwareBazaar fetch failed: {e}")
+            raise

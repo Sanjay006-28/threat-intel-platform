@@ -88,25 +88,46 @@ Full technical, architectural, and operational documentation is available in the
    - **Time-Window Aggregation:** Replaces per-line alert flooding with configurable 1-hour window deduplication. Repeated hits within the window increment `hit_count` and update `last_seen` on the existing alert row.
    - **Explainable Scoring:** Bounded between 0 and 100 based on base confidence, corroborating independent feeds, indicator fidelity, and log occurrence frequency.
 
-4. **Incident Case Management:**
+4. **Incident Case Management & Safe Deletion Lifecycle:**
    - Multi-alert grouping under formal incident cases with status tracking (`Open`, `Investigating`, `Contained`, `Resolved`, `Closed`), analyst notes, and resolution summaries.
+   - **Safe Soft-Deletion:** Analysts can archive incidents with explicit confirmation. Soft-deleted incidents move to the Deleted Cases ledger while preserving 100% of linked alerts and forensic evidence, with immediate one-click restore capability.
 
-5. **High-Performance Batch Ingestion & Watcher:**
+5. **Webhook Security & SSRF Hardening:**
+   - **Authenticated Encryption at Rest:** Webhook URLs and tokens are encrypted with Fernet (`AES-128-CBC` + `HMAC-SHA256`) via `app/crypto.py` using a key stored outside the database (`.webhook_encryption.key`).
+   - **DNS Rebinding & TOCTOU Defense:** Custom `PinnedIPAdapter` and `PinnedHTTPSConnection` force TCP sockets to connect exclusively to pre-validated public IPs while preserving TLS SNI and certificate verification.
+   - **SSRF Redirect Blocking:** Outbound dispatches strictly enforce `allow_redirects=False` to block internal redirect traversal.
+   - **Secret Masking:** Complete tokens are masked as `https://.../********` across all HTML templates, API responses, and audit logs.
+
+6. **Global Whitelist Suppression Engine:**
+   - **Multi-Category Normalization & Validation:** Enforces strict regex and structural validation for IPv4, IPv6, CIDR blocks, Domains, URLs, and File Hashes (MD5, SHA-1, SHA-256).
+   - **Alert Suppression in Pipeline:** Verified exact matches, CIDR subnet containment, and label-bounded subdomain checks suppress false-positive alerts before incident creation.
+   - **Lifecycle & Automated Expiration:** Add, edit, activate, deactivate, and soft-delete policies with authenticated analyst attribution. Expired policies auto-deactivate.
+
+7. **Threat Feed Hub Reliability & Terminal States:**
+   - **5 Production Connectors:** Abuse.ch ThreatFox, URLhaus, FeodoTracker, MalwareBazaar, and AlienVault OTX.
+   - **Distinct State Reporting:** Accurately separates `Enabled & Configured`, `Disabled`, `NOT CONFIGURED - OPTIONAL` (e.g. unkeyed AlienVault OTX), `Configuration Error`, and `Synchronization Failure`.
+   - **Guaranteed Terminal States:** Built-in execution timeouts, exception capture, and deduplication accounting ensure runs never remain orphaned in a `processing` state.
+
+8. **SOC Operational Audit Trails:**
+   - Searchable, multi-factor filtered audit trails supporting user, action, date boundaries, and client IP filtering.
+   - Database-side pagination (25, 50, 100 per page) with query preservation and immutable audit logging.
+
+9. **High-Performance Batch Ingestion & Watcher:**
    - **Chunked Transactions:** Ingestion processes log lines in configurable 500-event database commits, increasing throughput to over 580 events/second committed to disk and 7,900+ lines/second in-memory matching.
    - **File-Lock Resilient Watcher:** Detects file write completion via size stability and read-lock tests before processing dropped files in `auto_ingest/`.
 
-6. **Automated Threat Intelligence & Lifecycle:**
-   - **APScheduler Daemon:** Automatically synchronizes threat feeds every 6 hours in the background.
-   - **Automated IOC Expiration:** Daily deactivation of indicators past TTL (`IOC_TTL_DAYS=30`) without deleting historical forensics.
-   - **IOC Repository Interface:** Server-side pagination, search by indicator value/tag, and manual IOC creation.
+10. **Automated Threat Intelligence & Lifecycle:**
+    - **APScheduler Daemon:** Automatically synchronizes threat feeds every 6 hours in the background.
+    - **Automated IOC Expiration:** Daily deactivation of indicators past TTL (`IOC_TTL_DAYS=30`) without deleting historical forensics.
+    - **IOC Repository Filtering Engine:** Real-time search across values, CIDR subnets, and descriptions with type and status filtering.
 
-7. **Threat Enrichment & MITRE ATT&CK Mapping:**
-   - **Bounded TTL Cache:** Prevents memory leaks and third-party rate-limit delays. Internal RFC1918 IPs resolve locally without external WAN queries.
-   - **Precise MITRE ATT&CK Mapping:** Maps threat tags to official technique IDs, tactics, and external reference links.
+11. **Threat Enrichment & MITRE ATT&CK Mapping:**
+    - **Bounded TTL Cache:** Prevents memory leaks and third-party rate-limit delays. Internal RFC1918 IPs resolve locally without external WAN queries.
+    - **Precise MITRE ATT&CK Mapping:** Maps threat tags to official technique IDs, tactics, and external reference links.
 
-8. **Interoperability & Passive Containment:**
-   - **STIX 2.1 Bidirectional Support:** Export active IOCs as compliant STIX 2.1 bundles, and import external STIX 2.1 bundles into the database.
-   - **Passive Containment Advisory:** Generates copy-paste rules for iptables, Windows Firewall (unique display names), DNS sinkholes, and Suricata/Snort.
+12. **Interoperability & Passive Containment:**
+    - **OASIS STIX 2.1 Bidirectional Support:** Export active IOCs as compliant STIX 2.1 JSON bundles, and import external STIX 2.1 bundles into the database.
+    - **Passive Containment Advisory:** Generates copy-paste rules for iptables, Windows Firewall (unique display names), DNS sinkholes, and Suricata/Snort.
 
 ---
 
@@ -123,6 +144,7 @@ threat_intel_platform/
 │   ├── audit.py          # Centralized audit logging utility
 │   ├── config.py         # Configuration settings & environment variables
 │   ├── correlator.py     # O(1) in-memory matcher with CIDR & label-bounded domain lookups
+│   ├── crypto.py         # Authenticated Fernet encryption for webhook secrets at rest
 │   ├── database.py       # SQLite connection with WAL mode & automated schema migrations
 │   ├── enrichment.py     # Bounded TTL cached GeoIP, ASN, Org & reverse DNS resolver
 │   ├── main.py           # FastAPI entrypoint, lifespan daemon & authentication middleware
@@ -145,18 +167,21 @@ threat_intel_platform/
 │   ├── BACKUP_RECOVERY_GUIDE.md
 │   ├── DEMO_WALKTHROUGH.md
 │   └── screenshots/
-├── collect_laptop_logs.py# Live host outbound netstat & DNS client cache collector
-├── demo_security.log     # Curated multi-vector test security log
-├── Dockerfile            # Container image specification
-├── docker-compose.yml    # Container orchestration file
-├── manage_backup.py      # SQLite WAL online backup and disaster recovery utility
-├── requirements.txt      # Python dependencies
-├── run.py                # Server launcher with dynamic port binding & auto-browser launch
-├── start.bat             # 1-Click Windows launch script
-├── test_comprehensive_suite.py # Automated functional validation & benchmark suite
-├── test_enhancements.py  # Architectural enhancement test suite
-├── test_match.py         # Multi-threat log matching test
-└── test_strict_verification.py # 17-point independent verification & 50,000-line WAL stress benchmark
+├── backups/               # Automated SQLite database backups & snapshots (gitignored)
+├── demo_logs/             # Curated security telemetry (demo_security.log, Zeek, Suricata, Syslog)
+├── scripts/               # Maintenance, demo seeding, and screenshot capture tools
+│   ├── manage_backup.py   # SQLite WAL-safe backup & disaster recovery utility
+│   ├── seed_demo.py       # Demonstration data initializer
+│   ├── inject_mock_iocs.py# Mock threat indicator injector
+│   ├── generate_mock_logs.py # Synthetic log generator
+│   ├── collect_laptop_logs.py # Live host outbound netstat & DNS client cache collector
+│   └── capture/           # Automated SOC UI verification capture scripts
+├── Dockerfile             # Container image specification
+├── docker-compose.yml     # Container orchestration file
+├── manage_backup.py       # Backward-compatible CLI backup launcher
+├── requirements.txt       # Python dependencies
+├── run.py                 # Server launcher with dynamic port binding & auto-browser launch
+└── start.bat              # 1-Click Windows launch script
 ```
 
 ---
@@ -250,28 +275,27 @@ python manage_backup.py verify
 
 ---
 
-## 8. Automated Verification & Testing
+## 8. Operational Verification & Health Auditing
 
-SENTINEL includes comprehensive test suites covering all architectural layers:
+SENTINEL features built-in verification scripts and health probes to ensure high availability and integrity across all SOC subsystems:
 
 ```bash
-# 1. Run Complete 17-Point Independent Verification & 50,000-Line Benchmark
-python test_strict_verification.py
+# 1. Verify live SQLite database health and record metrics
+python manage_backup.py verify
 
-# 2. Run Comprehensive Functional & Scoring Test Suite
-python test_comprehensive_suite.py
+# 2. Trigger automated database backup with WAL checkpointing
+python manage_backup.py backup
 
-# 3. Test Core Threat Intel Enhancements Suite
-python test_enhancements.py
-
-# 4. Test Multi-Threat Match Engine against Demo Log
-python test_match.py
+# 3. Re-run demo security telemetry correlation
+# Available via SOC UI (/logs -> "Run Built-in Demo Log") or via scripts:
+python scripts/seed_demo.py
 ```
 
 ### Measured Performance Benchmarks
 - **In-Memory Matching Throughput:** `7,976 lines/second` (125.4 $\mu$s/line).
 - **End-to-End SQLite WAL Ingestion:** `585 events/second` committed to disk across 50,000 events.
-- **Exact Hash/IP Correlation Latency:** `8–12 microseconds` per lookup across 39,522 IOCs.
+- **Exact Hash/IP Correlation Latency:** `8–12 microseconds` per lookup across 39,523 IOCs.
+- **SSRF & DNS Rebinding Protection:** Hardened `PinnedIPAdapter` with strict socket IP pinning and `allow_redirects=False`.
 
 ---
 

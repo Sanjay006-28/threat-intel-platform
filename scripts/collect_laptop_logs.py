@@ -10,7 +10,10 @@ import subprocess
 import re
 from datetime import datetime
 
-def collect_laptop_traffic(output_dir="auto_ingest"):
+def collect_laptop_traffic(output_dir=None):
+    if output_dir is None:
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        output_dir = os.path.join(base_dir, "auto_ingest")
     os.makedirs(output_dir, exist_ok=True)
     timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     log_lines = []

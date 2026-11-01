@@ -1,7 +1,10 @@
+import logging
 import requests
 from typing import List, Dict, Any
 from app.collectors.base import BaseCollector
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 class OTXCollector(BaseCollector):
     def __init__(self):
@@ -9,8 +12,8 @@ class OTXCollector(BaseCollector):
 
     def fetch(self) -> List[Dict[str, Any]]:
         api_key = settings.OTX_API_KEY
-        if not api_key:
-            print("[*] AlienVault OTX skipped: No API key provided.")
+        if not api_key or "your_otx" in api_key.lower():
+            logger.info("[*] AlienVault OTX skipped: No API key provided.")
             return []
 
         url = "https://otx.alienvault.com/api/v1/pulses/subscribed"
@@ -30,5 +33,5 @@ class OTXCollector(BaseCollector):
                     })
             return records
         except Exception as e:
-            print(f"[!] AlienVault OTX fetch failed: {e}")
-            return []
+            logger.error(f"[!] AlienVault OTX fetch failed: {e}")
+            raise

@@ -1,8 +1,10 @@
 import os
 import sys
 
-# Ensure app is in path
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+# Ensure project root is in sys.path
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
 
 from app.database import SessionLocal
 from app.models import IOC, IOCSource

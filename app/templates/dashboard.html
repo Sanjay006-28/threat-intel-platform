@@ -3,7 +3,9 @@
 {% block title %}Executive Threat Overview // SENTINEL CTI{% endblock %}
 
 {% block head %}
+<!-- Leaflet Map CSS & JS in Head to Guarantee Synchronous Availability -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
     .leaflet-container {
         background: #0B0F19 !important;
@@ -19,12 +21,49 @@
     .leaflet-popup-tip {
         background: #111827;
     }
+    .metric-card-kpi {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-subtle);
+        border-radius: 10px;
+        padding: 1.25rem;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        position: relative;
+        overflow: hidden;
+        transition: transform 0.15s ease, border-color 0.15s ease;
+    }
+    .metric-card-kpi:hover {
+        border-color: var(--border-active);
+        transform: translateY(-2px);
+    }
+    .metric-card-kpi::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: var(--card-accent, var(--accent-cyan));
+    }
+    .status-strip-item {
+        background: rgba(31, 41, 55, 0.35);
+        border: 1px solid var(--border-subtle);
+        border-radius: 8px;
+        padding: 0.75rem 0.85rem;
+        height: 100%;
+        transition: border-color 0.15s ease;
+    }
+    .status-strip-item:hover {
+        border-color: rgba(59, 130, 246, 0.4);
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <!-- Console Header & Actions -->
-<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between pb-3 mb-4 border-bottom" style="border-color: var(--border-subtle) !important;">
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between pb-3 mb-3 border-bottom" style="border-color: var(--border-subtle) !important;">
     <div>
         <div class="d-flex align-items-center gap-2 mb-1">
             <span class="badge bg-primary bg-opacity-25 text-info border border-info border-opacity-50 small font-mono">SOC CONSOLE v2.4</span>
@@ -46,118 +85,169 @@
     </div>
 </div>
 
-<!-- Primary Telemetry Metric KPIs -->
+<!-- Telemetry & Operational Timestamp Strip -->
+<div class="p-2 mb-4 rounded-3 border d-flex flex-wrap align-items-center justify-content-between gap-3 text-secondary small font-mono" style="background: rgba(17, 24, 39, 0.7); border-color: var(--border-subtle) !important; font-size: 0.75rem;">
+    <div class="d-flex align-items-center gap-3">
+        <div class="d-flex align-items-center gap-1 text-white">
+            <span class="status-pulse-dot me-1"></span>
+            <span class="text-success fw-semibold">WATCHER: ACTIVE</span>
+            <span class="text-muted">(auto_ingest/)</span>
+        </div>
+        <span class="text-muted d-none d-md-inline">|</span>
+        <div class="d-none d-md-flex align-items-center gap-1">
+            <i class="bi bi-hdd-network text-info"></i>
+            <span>Latest Feed Sync:</span>
+            <strong class="text-white">{{ latest_feed_sync_time_str }}</strong>
+        </div>
+    </div>
+
+    <div class="d-flex align-items-center gap-3 ms-auto ms-md-0">
+        <div class="d-none d-lg-flex align-items-center gap-1">
+            <i class="bi bi-file-earmark-check {% if is_telemetry_stale %}text-warning{% else %}text-success{% endif %}"></i>
+            <span>Log Stream:</span>
+            <strong class="text-white">{{ latest_log_time_str }}</strong>
+            {% if is_telemetry_stale %}
+            <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 ms-1 font-mono" style="font-size: 0.65rem;" title="{{ telemetry_stale_warning }}">
+                <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ telemetry_freshness_label }}
+            </span>
+            {% else %}
+            <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 ms-1 font-mono" style="font-size: 0.65rem;">
+                <i class="bi bi-check-circle-fill me-1"></i>{{ telemetry_freshness_label }}
+            </span>
+            {% endif %}
+        </div>
+        <span class="text-muted d-none d-lg-inline">|</span>
+        <div class="d-flex align-items-center gap-1">
+            <i class="bi bi-clock text-info"></i>
+            <span>Server Time:</span>
+            <strong class="text-info">{{ now_utc }}</strong>
+        </div>
+    </div>
+</div>
+
+<!-- Primary Telemetry Metric KPIs (Clean 4-Card Responsive Grid) -->
 <div class="row g-3 mb-4">
-    <!-- Total IOCs -->
-    <div class="col-12 col-sm-6 col-xl-3">
-        <div class="metric-card" style="--card-accent: var(--accent-cyan);">
+    <!-- Card 1: Total IOCs -->
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="metric-card-kpi" style="--card-accent: var(--accent-cyan);">
             <div class="d-flex justify-content-between align-items-start">
                 <div>
-                    <div class="metric-label">Threat Indicators (IOCs)</div>
-                    <div class="metric-value font-mono">{{ "{:,}".format(total_iocs) }}</div>
+                    <div class="text-secondary small fw-medium text-uppercase tracking-wider" style="font-size: 0.72rem; letter-spacing: 0.05em;">Threat Indicators (IOCs)</div>
+                    <div class="fs-3 fw-bold font-mono text-white mt-1">{{ "{:,}".format(total_iocs) }}</div>
                 </div>
                 <div class="p-2 rounded-3" style="background: rgba(6, 182, 212, 0.15); color: var(--accent-cyan);">
                     <i class="bi bi-shield-check fs-4"></i>
                 </div>
             </div>
-            <div class="mt-3 d-flex align-items-center gap-2">
+            <div class="mt-3 pt-2 border-top d-flex align-items-center justify-content-between" style="border-color: rgba(255,255,255,0.06) !important;">
                 <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 small font-mono">{{ active_pct }}% ACTIVE</span>
-                <span class="text-muted small" style="font-size: 0.75rem;">Verified threat intelligence</span>
+                <span class="text-muted small" style="font-size: 0.72rem;">Verified threat intelligence</span>
             </div>
         </div>
     </div>
 
-    <!-- Security Alerts -->
-    <div class="col-12 col-sm-6 col-xl-3">
-        <div class="metric-card" style="--card-accent: var(--accent-rose);">
+    <!-- Card 2: Correlated Detections -->
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="metric-card-kpi" style="--card-accent: var(--accent-rose);">
             <div class="d-flex justify-content-between align-items-start">
                 <div>
-                    <div class="metric-label">Active Detections</div>
-                    <div class="metric-value font-mono text-danger">{{ open_alerts }}</div>
+                    <div class="text-secondary small fw-medium text-uppercase tracking-wider" style="font-size: 0.72rem; letter-spacing: 0.05em;">Correlated Detections</div>
+                    <div class="fs-3 fw-bold font-mono text-danger mt-1">{{ active_alerts }}</div>
                 </div>
                 <div class="p-2 rounded-3" style="background: rgba(239, 68, 68, 0.15); color: var(--accent-rose);">
                     <i class="bi bi-exclamation-triangle fs-4"></i>
                 </div>
             </div>
-            <div class="mt-3 d-flex align-items-center gap-2">
+            <div class="mt-3 pt-2 border-top d-flex align-items-center gap-2" style="border-color: rgba(255,255,255,0.06) !important;">
                 <span class="badge badge-severity-critical small font-mono">{{ critical_alerts }} CRIT</span>
-                <span class="badge badge-severity-high small font-mono">{{ high_alerts }} HIGH</span>
-                <span class="text-muted small ms-auto" style="font-size: 0.75rem;">Require triage</span>
+                <span class="badge bg-secondary bg-opacity-25 text-info small font-mono">{{ new_alerts }} NEW</span>
+                {% if investigating_alerts > 0 %}
+                <span class="badge bg-warning bg-opacity-25 text-warning small font-mono">{{ investigating_alerts }} IN TRIAGE</span>
+                {% endif %}
             </div>
         </div>
     </div>
 
-    <!-- Active Incidents Cases -->
-    <div class="col-12 col-sm-6 col-xl-3">
-        <div class="metric-card" style="--card-accent: var(--accent-amber);">
+    <!-- Card 3: Incident Cases -->
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="metric-card-kpi" style="--card-accent: var(--accent-amber);">
             <div class="d-flex justify-content-between align-items-start">
                 <div>
-                    <div class="metric-label">Incident Cases</div>
-                    <div class="metric-value font-mono text-warning">{{ open_incidents }}</div>
+                    <div class="text-secondary small fw-medium text-uppercase tracking-wider" style="font-size: 0.72rem; letter-spacing: 0.05em;">Active Incident Cases</div>
+                    <div class="fs-3 fw-bold font-mono text-warning mt-1">{{ open_incidents }}</div>
                 </div>
                 <div class="p-2 rounded-3" style="background: rgba(245, 158, 11, 0.15); color: var(--accent-amber);">
                     <i class="bi bi-folder-check fs-4"></i>
                 </div>
             </div>
-            <div class="mt-3 d-flex align-items-center gap-2">
-                <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 small font-mono">{{ total_incidents }} TOTAL</span>
-                <a href="/incidents" class="text-info small ms-auto text-decoration-none" style="font-size: 0.75rem;">Manage Cases &rarr;</a>
-            </div>
-        </div>
-    </div>
-            </div>
-            <div class="mt-3 d-flex align-items-center gap-2">
-                <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 small font-mono">{{ "{:,}".format(total_lines) }} RECORDS</span>
-                <span class="text-muted small" style="font-size: 0.75rem;">Streamed & correlated</span>
+            <div class="mt-3 pt-2 border-top d-flex align-items-center justify-content-between" style="border-color: rgba(255,255,255,0.06) !important;">
+                <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 small font-mono">{{ total_incidents }} TOTAL CASES</span>
+                <a href="/incidents" class="text-info small text-decoration-none" style="font-size: 0.72rem;">Manage Cases &rarr;</a>
             </div>
         </div>
     </div>
 
-    <!-- Threat Feeds -->
-    <div class="col-12 col-sm-6 col-xl-3">
-        <div class="metric-card" style="--card-accent: var(--accent-amber);">
+    <!-- Card 4: Telemetry Logs -->
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="metric-card-kpi" style="--card-accent: var(--accent-blue);">
             <div class="d-flex justify-content-between align-items-start">
                 <div>
-                    <div class="metric-label">Active Feed Channels</div>
-                    <div class="metric-value font-mono">{{ feeds|length }}</div>
+                    <div class="text-secondary small fw-medium text-uppercase tracking-wider" style="font-size: 0.72rem; letter-spacing: 0.05em;">Ingested Security Logs</div>
+                    <div class="fs-3 fw-bold font-mono text-info mt-1">{{ logs_ingested }}</div>
                 </div>
-                <div class="p-2 rounded-3" style="background: rgba(245, 158, 11, 0.15); color: var(--accent-amber);">
-                    <i class="bi bi-broadcast fs-4"></i>
+                <div class="p-2 rounded-3" style="background: rgba(59, 130, 246, 0.15); color: var(--accent-blue);">
+                    <i class="bi bi-file-earmark-bar-graph fs-4"></i>
                 </div>
             </div>
-            <div class="mt-3 d-flex align-items-center gap-2">
-                <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 small font-mono">AUTOMATED</span>
-                <span class="text-muted small" style="font-size: 0.75rem;">Scheduled ingestion</span>
+            <div class="mt-3 pt-2 border-top d-flex align-items-center justify-content-between" style="border-color: rgba(255,255,255,0.06) !important;">
+                <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 small font-mono">{{ "{:,}".format(total_lines) }} EVENTS</span>
+                {% if is_telemetry_stale %}
+                <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 small font-mono" title="{{ telemetry_stale_warning }}">
+                    <i class="bi bi-clock-history me-1"></i>{{ telemetry_freshness_label }}
+                </span>
+                {% else %}
+                <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 small font-mono">
+                    <i class="bi bi-check-circle me-1"></i>FRESH
+                </span>
+                {% endif %}
             </div>
         </div>
     </div>
 </div>
 
-<!-- Threat Feed Hub Status Strip -->
+<!-- Configured Feed Connectors Strip (Operational vs Unconfigured) -->
 <div class="card card-soc mb-4">
-    <div class="card-soc-header py-2 px-3">
+    <div class="card-soc-header py-2 px-3 d-flex align-items-center justify-content-between">
         <div class="d-flex align-items-center gap-2">
-            <i class="bi bi-activity text-info"></i>
-            <span class="small fw-semibold text-uppercase tracking-wider" style="font-size: 0.75rem; letter-spacing: 0.08em; color: var(--text-secondary);">External Intelligence Connectors</span>
+            <i class="bi bi-broadcast text-info"></i>
+            <span class="small fw-semibold text-uppercase tracking-wider" style="font-size: 0.75rem; letter-spacing: 0.08em; color: var(--text-secondary);">Configured Feed Connectors</span>
+            <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 small font-mono" style="font-size: 0.68rem;">{{ operational_feeds_count }} OPERATIONAL</span>
+            {% if unconfigured_feeds_count > 0 %}
+            <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 small font-mono" style="font-size: 0.68rem;">{{ unconfigured_feeds_count }} UNCONFIGURED (OPTIONAL)</span>
+            {% endif %}
         </div>
         <a href="/feeds" class="small text-info text-decoration-none" style="font-size: 0.75rem;">View Feed Manager &rarr;</a>
     </div>
     <div class="card-body p-3">
         <div class="row g-2">
-            {% for feed in feeds %}
-            <div class="col-12 col-md-4 col-xl">
-                <div class="p-2 rounded-3 border" style="background: rgba(31, 41, 55, 0.3); border-color: var(--border-subtle) !important;">
+            {% for feed in feed_summary %}
+            <div class="col-12 col-sm-6 col-lg">
+                <div class="status-strip-item">
                     <div class="d-flex align-items-center justify-content-between mb-1">
-                        <span class="fw-semibold small text-white">{{ feed.name }}</span>
-                        {% if feed.enabled %}
-                        <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25" style="font-size: 0.65rem;">ACTIVE</span>
-                        {% else %}
-                        <span class="badge bg-secondary bg-opacity-25 text-muted" style="font-size: 0.65rem;">DISABLED</span>
-                        {% endif %}
+                        <span class="fw-semibold small text-white text-truncate" title="{{ feed.name }}">{{ feed.name }}</span>
+                        <span class="badge bg-{{ feed.badge_class }} bg-opacity-10 text-{{ feed.badge_class }} border border-{{ feed.badge_class }} border-opacity-25" style="font-size: 0.65rem;">
+                            {{ feed.status_badge }}
+                        </span>
                     </div>
-                    <div class="d-flex justify-content-between align-items-center text-muted" style="font-size: 0.7rem;">
-                        <span>Interval: {{ feed.interval_minutes }}m</span>
-                        <span class="font-mono">{{ feed.last_run_status|default('Idle')|upper }}</span>
+                    <div class="text-muted small" style="font-size: 0.7rem;">
+                        <div>Stored: <strong class="text-info font-mono">{{ "{:,}".format(feed.stored_count) }}</strong> IOCs</div>
+                        <div class="text-truncate text-secondary mt-1" style="font-size: 0.68rem;" title="{{ feed.config_status }}">
+                            {{ feed.config_status }}
+                        </div>
+                        <div class="d-flex justify-content-between mt-1 pt-1 border-top" style="border-color: rgba(255,255,255,0.05) !important; font-size: 0.65rem;">
+                            <span>Sync: {{ feed.interval_minutes }}m</span>
+                            <span class="font-mono text-muted">{{ feed.last_run_str }}</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -168,105 +258,127 @@
 
 <!-- Global Threat Origin Matrix (Interactive World Map) -->
 <div class="card card-soc mb-4">
-    <div class="card-soc-header py-2 px-3">
+    <div class="card-soc-header py-2 px-3 d-flex align-items-center justify-content-between">
         <div class="d-flex align-items-center gap-2">
             <i class="bi bi-globe-americas text-info fs-5"></i>
             <div>
                 <h6 class="fw-bold mb-0 text-white">Global Threat Origin Matrix</h6>
-                <small class="text-muted" style="font-size: 0.72rem;">Live geopolitical telemetry mapping correlated attack origins</small>
+                <small class="text-muted" style="font-size: 0.72rem;">Approximate Geopolitical IP Geolocation &bull; City/Country Resolution (Not Physical Addresses)</small>
             </div>
         </div>
         <div class="d-flex align-items-center gap-2">
             <a href="/api/stix/export" class="btn btn-sm btn-outline-info font-mono" style="font-size: 0.75rem;" title="Download STIX 2.1 Bundle">
-                <i class="bi bi-box-arrow-down"></i> Export STIX 2.1
+                <i class="bi bi-download me-1"></i>STIX 2.1 Export
             </a>
-            <span class="badge bg-danger bg-opacity-25 text-danger font-mono" style="font-size: 0.7rem;">
-                <span class="status-pulse-dot me-1"></span> LIVE INCIDENTS
+            <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 font-mono" style="font-size: 0.7rem;">
+                <i class="bi bi-geo-alt me-1"></i>GEOLOCATED THREATS
             </span>
         </div>
     </div>
-    <div class="card-body p-0 position-relative">
-        <div id="threatWorldMap" style="height: 360px; width: 100%; border-radius: 0 0 12px 12px;"></div>
+    <div class="card-body p-0 position-relative" style="min-height: 380px;">
+        <!-- Leaflet Map Container -->
+        <div id="threatWorldMap" style="height: 380px; width: 100%; border-radius: 0 0 12px 12px;"></div>
+        
+        <!-- Helpful Empty State Overlay (Shows if no external geolocated IPs exist) -->
+        <div id="mapEmptyState" class="position-absolute top-50 start-50 translate-middle text-center p-3 rounded-3 border" style="display: none; z-index: 500; background: rgba(17, 24, 39, 0.92); border-color: var(--border-subtle) !important; max-width: 480px;">
+            <i class="bi bi-geo-alt-fill text-muted fs-2 d-block mb-2"></i>
+            <h6 class="text-white fw-bold mb-1">No Geolocated Public Attack Endpoints</h6>
+            <p class="small text-muted mb-0">Current correlated alerts represent internal RFC1918 lateral movement, file hashes, or non-routable domains without external WAN IP endpoints.</p>
+        </div>
     </div>
 </div>
 
-<!-- Real Analytics Charts Grid -->
+<!-- Threat Analytics Charts Grid -->
 <div class="row g-3 mb-4">
-    <!-- IOC Vector Breakdown Doughnut -->
+    <!-- Chart 1: Indicator Distribution by Vector -->
     <div class="col-12 col-lg-6">
         <div class="card card-soc h-100">
-            <div class="card-soc-header">
+            <div class="card-soc-header py-2 px-3 d-flex justify-content-between align-items-center">
                 <div>
                     <h6 class="fw-bold mb-0 text-white">Indicator Distribution by Vector</h6>
-                    <small class="text-muted" style="font-size: 0.75rem;">Live indicator breakdown across known threat surfaces</small>
+                    <small class="text-muted" style="font-size: 0.75rem;">Threat intelligence database coverage by artifact type</small>
                 </div>
                 <span class="badge bg-secondary bg-opacity-25 text-info font-mono small">{{ "{:,}".format(total_iocs) }} TOTAL</span>
             </div>
-            <div class="card-body p-4 d-flex align-items-center justify-content-center" style="min-height: 280px;">
-                <div style="width: 100%; max-width: 380px;">
-                    <canvas id="iocTypeChart"></canvas>
+            <div class="card-body d-flex flex-column justify-content-center p-3 position-relative" style="height: 300px;">
+                {% if total_iocs > 0 %}
+                <canvas id="iocTypeChart"></canvas>
+                {% else %}
+                <div class="text-center text-muted">
+                    <i class="bi bi-pie-chart fs-1 d-block mb-2"></i>
+                    <span>No threat indicators stored. Synchronize external feeds.</span>
                 </div>
+                {% endif %}
             </div>
         </div>
     </div>
 
-    <!-- Severity Distribution Bar Chart -->
+    <!-- Chart 2: Threat Severity Stratification -->
     <div class="col-12 col-lg-6">
         <div class="card card-soc h-100">
-            <div class="card-soc-header">
+            <div class="card-soc-header py-2 px-3 d-flex justify-content-between align-items-center">
                 <div>
                     <h6 class="fw-bold mb-0 text-white">Threat Severity Classification</h6>
-                    <small class="text-muted" style="font-size: 0.75rem;">Risk score stratification of correlated intelligence</small>
+                    <small class="text-muted" style="font-size: 0.75rem;">Active detections classified by calibrated risk score</small>
                 </div>
-                <span class="badge bg-danger bg-opacity-25 text-danger font-mono small">ACTIVE ALERTS</span>
+                <span class="badge bg-danger bg-opacity-25 text-danger font-mono small">{{ active_alerts }} ACTIVE</span>
             </div>
-            <div class="card-body p-4 d-flex align-items-center justify-content-center" style="min-height: 280px;">
-                <div style="width: 100%; max-width: 480px;">
-                    <canvas id="severityChart"></canvas>
+            <div class="card-body d-flex flex-column justify-content-center p-3 position-relative" style="height: 300px;">
+                {% if active_alerts > 0 %}
+                <canvas id="severityChart"></canvas>
+                {% else %}
+                <div class="text-center text-muted">
+                    <i class="bi bi-bar-chart fs-1 d-block mb-2"></i>
+                    <span>No active detections. Security posture clean.</span>
                 </div>
+                {% endif %}
             </div>
         </div>
     </div>
 </div>
 
-<!-- High Priority Correlated Detections Table -->
+<!-- Recent Correlated High-Priority Detections Table -->
 <div class="card card-soc mb-4">
-    <div class="card-soc-header">
+    <div class="card-soc-header py-2 px-3 d-flex justify-content-between align-items-center">
         <div>
-            <h6 class="fw-bold mb-0 text-white d-flex align-items-center gap-2">
-                <i class="bi bi-shield-exclamation text-danger"></i>
-                <span>Recent High-Priority Detections</span>
-            </h6>
-            <small class="text-muted" style="font-size: 0.75rem;">Real-time alerts triggered by log artifact correlation engine</small>
+            <h6 class="fw-bold mb-0 text-white">Correlated Threat Detections</h6>
+            <small class="text-muted" style="font-size: 0.75rem;">Security events matched against 39,000+ indicators with affected host attribution</small>
         </div>
         <a href="/alerts" class="btn btn-sm btn-outline-secondary text-white" style="font-size: 0.75rem;">
-            View All Detections ({{ open_alerts }})
+            View All Detections ({{ active_alerts }})
         </a>
     </div>
     
     <div class="table-responsive">
-        <table class="table table-soc mb-0">
+        <table class="table table-soc mb-0 align-middle">
             <thead>
                 <tr>
                     <th style="width: 80px;">Alert ID</th>
                     <th>Matched Indicator</th>
-                    <th style="width: 120px;">Vector Type</th>
-                    <th style="width: 110px;">Severity</th>
-                    <th style="width: 120px;">Threat Score</th>
-                    <th style="width: 160px;">Timestamp</th>
+                    <th style="width: 110px;">Type</th>
+                    <th style="width: 180px;">Affected Endpoint</th>
+                    <th style="width: 120px;">Severity & Status</th>
+                    <th style="width: 140px;">Threat Score</th>
+                    <th style="width: 180px;">Timestamp (UTC)</th>
                     <th style="width: 100px;" class="text-end">Actions</th>
                 </tr>
             </thead>
             <tbody>
-                {% for alert in recent_alerts %}
+                {% for item in recent_alerts %}
+                {% set alert = item.alert %}
                 <tr>
                     <td class="font-mono text-muted">#{{ alert.id }}</td>
                     <td>
                         <div class="d-flex align-items-center gap-2">
                             <i class="bi bi-bug text-danger small"></i>
-                            <span class="font-mono fw-semibold text-white text-truncate" style="max-width: 320px;" title="{{ alert.matched_value }}">
+                            <span class="font-mono fw-semibold text-white text-truncate" style="max-width: 280px;" title="{{ alert.matched_value }}">
                                 {{ alert.matched_value }}
                             </span>
+                            {% if item.is_aggregated %}
+                            <span class="badge bg-secondary bg-opacity-25 text-warning font-mono" style="font-size: 0.65rem;" title="Aggregated events in time-window">
+                                &times;{{ alert.hit_count }}
+                            </span>
+                            {% endif %}
                         </div>
                     </td>
                     <td>
@@ -275,20 +387,37 @@
                         </span>
                     </td>
                     <td>
-                        <span class="badge badge-severity-{{ alert.severity }} px-2 py-1 small">
-                            {{ alert.severity|upper }}
-                        </span>
+                        <div class="d-flex align-items-center gap-1 font-mono small">
+                            <i class="bi bi-display text-muted me-1"></i>
+                            <span class="text-truncate text-light" style="max-width: 160px;" title="{{ item.endpoint }}">
+                                {{ item.endpoint }}
+                            </span>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center gap-1 flex-wrap">
+                            <span class="badge badge-severity-{{ alert.severity }} px-2 py-1 small">
+                                {{ alert.severity|upper }}
+                            </span>
+                            {% if alert.status == 'investigating' %}
+                            <span class="badge bg-warning bg-opacity-25 text-warning small">TRIAGE</span>
+                            {% elif alert.status == 'new' %}
+                            <span class="badge bg-danger bg-opacity-25 text-danger small">NEW</span>
+                            {% else %}
+                            <span class="badge bg-success bg-opacity-25 text-success small">{{ alert.status|upper }}</span>
+                            {% endif %}
+                        </div>
                     </td>
                     <td>
                         <div class="d-flex align-items-center gap-2">
                             <div class="progress flex-grow-1" style="height: 6px; background: rgba(255,255,255,0.08);">
-                                <div class="progress-bar bg-danger" role="progressbar" style="width: {{ alert.score }}%;" aria-valuenow="{{ alert.score }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                <div class="progress-bar bg-danger" role="progressbar" style="width: {{ item.score }}%;" aria-valuenow="{{ item.score }}" aria-valuemin="0" aria-valuemax="100"></div>
                             </div>
-                            <span class="font-mono small text-secondary" style="font-size: 0.75rem;">{{ alert.score }}</span>
+                            <span class="font-mono small text-white fw-semibold" style="font-size: 0.75rem;">{{ item.score }}/100</span>
                         </div>
                     </td>
-                    <td class="font-mono text-muted small">
-                        {{ alert.created_at.strftime('%Y-%m-%d %H:%M:%S') if alert.created_at else '--' }}
+                    <td class="font-mono text-muted small" style="font-size: 0.75rem;">
+                        {{ item.event_time_str }}
                     </td>
                     <td class="text-end">
                         <a href="/alerts/{{ alert.id }}" class="btn btn-sm btn-outline-info py-0 px-2 font-mono" style="font-size: 0.75rem;">
@@ -298,7 +427,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="7" class="text-center py-5 text-muted">
+                    <td colspan="8" class="text-center py-5 text-muted">
                         <i class="bi bi-shield-check text-success fs-1 d-block mb-2"></i>
                         <span class="fw-semibold">No Security Alerts Triggered</span>
                         <p class="small text-muted mb-0">Upload security audit logs to initiate automatic threat correlation.</p>
@@ -313,164 +442,213 @@
 
 {% block scripts %}
 <script>
-    // Real IOC Distribution Doughnut Chart
+    // ── 1. IOC Vector Distribution Doughnut Chart ────────────────
     const iocLabels = {{ ioc_types_labels|tojson }};
     const iocData = {{ ioc_types_data|tojson }};
+    const totalIocs = {{ total_iocs }};
 
-    const ctxIoc = document.getElementById('iocTypeChart').getContext('2d');
-    new Chart(ctxIoc, {
-        type: 'doughnut',
-        data: {
-            labels: iocLabels,
-            datasets: [{
-                data: iocData,
-                backgroundColor: [
-                    '#06B6D4', // Cyan
-                    '#3B82F6', // Blue
-                    '#8B5CF6', // Purple
-                    '#F59E0B', // Amber
-                    '#EF4444', // Red
-                    '#10B981', // Green
-                    '#EC4899'  // Pink
-                ],
-                borderColor: '#111827',
-                borderWidth: 2,
-                hoverOffset: 4
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        color: '#9CA3AF',
-                        font: { family: 'Inter', size: 11 },
-                        padding: 12,
-                        usePointStyle: true,
-                        pointStyle: 'circle'
+    const elIoc = document.getElementById('iocTypeChart');
+    if (elIoc && iocData.length > 0) {
+        new Chart(elIoc.getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: iocLabels,
+                datasets: [{
+                    data: iocData,
+                    backgroundColor: [
+                        '#06B6D4', '#3B82F6', '#8B5CF6', '#F59E0B', '#EF4444', '#10B981', '#EC4899'
+                    ],
+                    borderColor: '#111827',
+                    borderWidth: 2,
+                    hoverOffset: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: '#9CA3AF',
+                            font: { family: 'Inter', size: 11 },
+                            padding: 10,
+                            usePointStyle: true,
+                            pointStyle: 'circle'
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: '#1F2937',
+                        titleColor: '#F9FAFB',
+                        bodyColor: '#E5E7EB',
+                        borderColor: '#374151',
+                        borderWidth: 1,
+                        padding: 10,
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.label || '';
+                                let value = context.parsed || 0;
+                                let pct = totalIocs > 0 ? ((value / totalIocs) * 100).toFixed(1) : 0;
+                                return ' ' + label + ': ' + value.toLocaleString() + ' (' + pct + '%)';
+                            }
+                        }
                     }
                 },
-                tooltip: {
-                    backgroundColor: '#1F2937',
-                    titleColor: '#F9FAFB',
-                    bodyColor: '#E5E7EB',
-                    borderColor: '#374151',
+                cutout: '68%'
+            }
+        });
+    }
+
+    // ── 2. Active Threat Severity Stratification Chart ──────────
+    const severityLabels = ['Critical', 'High', 'Medium', 'Low'];
+    const severityData = {{ severity_data|tojson }};
+    const activeAlertsTotal = {{ active_alerts }};
+
+    const elSev = document.getElementById('severityChart');
+    if (elSev) {
+        new Chart(elSev.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: severityLabels,
+                datasets: [{
+                    label: 'Active Detections',
+                    data: severityData,
+                    backgroundColor: [
+                        'rgba(239, 68, 68, 0.85)',
+                        'rgba(245, 158, 11, 0.85)',
+                        'rgba(59, 130, 246, 0.85)',
+                        'rgba(100, 116, 139, 0.85)'
+                    ],
+                    borderColor: ['#EF4444', '#F59E0B', '#3B82F6', '#64748B'],
                     borderWidth: 1,
-                    padding: 10,
-                    callbacks: {
-                        label: function(context) {
-                            let label = context.label || '';
-                            let value = context.parsed || 0;
-                            return ' ' + label + ': ' + value.toLocaleString() + ' indicators';
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: '#9CA3AF', font: { family: 'Inter', size: 11 } }
+                    },
+                    y: {
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: { color: '#9CA3AF', font: { family: 'Inter', size: 11 }, precision: 0 },
+                        beginAtZero: true
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#1F2937',
+                        titleColor: '#F9FAFB',
+                        bodyColor: '#E5E7EB',
+                        borderColor: '#374151',
+                        borderWidth: 1,
+                        padding: 10,
+                        callbacks: {
+                            label: function(context) {
+                                let val = context.parsed.y || 0;
+                                let pct = activeAlertsTotal > 0 ? ((val / activeAlertsTotal) * 100).toFixed(1) : 0;
+                                return ' Active Alerts: ' + val + ' (' + pct + '%)';
+                            }
                         }
                     }
                 }
-            },
-            cutout: '70%'
+            }
+        });
+    }
+
+    // ── 3. Leaflet Global Threat Origin Matrix Map ───────────────
+    function initThreatMap() {
+        const mapContainer = document.getElementById('threatWorldMap');
+        const emptyState = document.getElementById('mapEmptyState');
+        if (!mapContainer) return;
+
+        if (typeof L === 'undefined') {
+            mapContainer.innerHTML = '<div class="p-4 text-center text-danger font-mono small">Leaflet map library could not be loaded from CDN. Check network connectivity.</div>';
+            return;
         }
-    });
 
-    // Real Severity Stratification Chart
-    const severityLabels = ['Critical', 'High', 'Medium', 'Low'];
-    const severityData = {{ severity_data|tojson }};
+        const threatMap = L.map('threatWorldMap', {
+            center: [25, 15],
+            zoom: 2,
+            minZoom: 1,
+            maxZoom: 9,
+            zoomControl: true,
+            attributionControl: false
+        });
 
-    const ctxSev = document.getElementById('severityChart').getContext('2d');
-    new Chart(ctxSev, {
-        type: 'bar',
-        data: {
-            labels: severityLabels,
-            datasets: [{
-                label: 'Correlated Alerts',
-                data: severityData,
-                backgroundColor: [
-                    'rgba(239, 68, 68, 0.8)',  // Critical Red
-                    'rgba(245, 158, 11, 0.8)', // High Amber
-                    'rgba(59, 130, 246, 0.8)',  // Medium Blue
-                    'rgba(100, 116, 139, 0.8)' // Low Slate
-                ],
-                borderColor: [
-                    '#EF4444',
-                    '#F59E0B',
-                    '#3B82F6',
-                    '#64748B'
-                ],
-                borderWidth: 1,
-                borderRadius: 6
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                x: {
-                    grid: { display: false },
-                    ticks: { color: '#9CA3AF', font: { family: 'Inter', size: 11 } }
-                },
-                y: {
-                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                    ticks: { color: '#9CA3AF', font: { family: 'Inter', size: 11 }, precision: 0 },
-                    beginAtZero: true
-                }
-            },
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    backgroundColor: '#1F2937',
-                    titleColor: '#F9FAFB',
-                    bodyColor: '#E5E7EB',
-                    borderColor: '#374151',
-                    borderWidth: 1,
-                    padding: 10
-                }
+        // Esri World Dark Gray Canvas tiles (Clean dark theme, 100% public, no watermarks, no API key required)
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ',
+            maxZoom: 16
+        }).addTo(threatMap);
+
+        const preloadedMarkers = {{ threat_map_markers|tojson }};
+
+        function plotMarkers(markers) {
+            if (!markers || markers.length === 0) {
+                if (emptyState) emptyState.style.display = 'block';
+                return;
+            }
+            if (emptyState) emptyState.style.display = 'none';
+            const markerLayers = [];
+
+            markers.forEach(m => {
+                const markerColor = m.severity === 'critical' ? '#EF4444' : (m.severity === 'high' ? '#F59E0B' : '#3B82F6');
+                const marker = L.circleMarker([m.lat, m.lon], {
+                    radius: m.severity === 'critical' ? 9 : 7,
+                    fillColor: markerColor,
+                    color: '#ffffff',
+                    weight: 1.5,
+                    opacity: 0.95,
+                    fillOpacity: 0.85
+                }).addTo(threatMap);
+
+                markerLayers.push(marker);
+
+                const popupHtml = `
+                    <div style="font-family: 'Inter', sans-serif; font-size: 0.8rem; line-height: 1.4; padding: 2px;">
+                        <div style="font-weight: 700; color: ${markerColor}; text-transform: uppercase;">[${m.severity.toUpperCase()}] Alert #${m.alert_id}</div>
+                        <div style="font-family: monospace; font-weight: 600; color: #fff; margin-top: 4px;">${m.indicator}</div>
+                        <div style="color: #9CA3AF; font-size: 0.75rem; margin-top: 2px;">Origin: <strong>${m.city || ''}, ${m.country}</strong> <span style="color:#64748B; font-size: 0.7rem;">(Approx. IP Geo)</span></div>
+                        <div style="color: #64748B; font-size: 0.72rem;">Org: ${m.org || 'Autonomous System'}</div>
+                        <div style="color: #06B6D4; font-size: 0.75rem; font-family: monospace; margin-top: 4px;">Threat Score: ${m.score}/100</div>
+                    </div>
+                `;
+                marker.bindPopup(popupHtml);
+            });
+
+            if (markerLayers.length > 0) {
+                const group = L.featureGroup(markerLayers);
+                threatMap.fitBounds(group.getBounds().pad(0.3));
             }
         }
-    });
 
-    // ── Leaflet World Threat Map ──────────────────────────
-    const threatMap = L.map('threatWorldMap', {
-        center: [30, 10],
-        zoom: 2,
-        minZoom: 1,
-        maxZoom: 8,
-        zoomControl: true,
-        attributionControl: false
-    });
-
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        subdomains: 'abcd',
-        maxZoom: 19
-    }).addTo(threatMap);
-
-    fetch('/api/threat-map')
-        .then(res => res.json())
-        .then(data => {
-            if (data && data.markers) {
-                data.markers.forEach(m => {
-                    const color = m.severity === 'critical' ? '#EF4444' : (m.severity === 'high' ? '#F59E0B' : '#3B82F6');
-                    const marker = L.circleMarker([m.lat, m.lon], {
-                        radius: m.severity === 'critical' ? 9 : 7,
-                        fillColor: color,
-                        color: '#ffffff',
-                        weight: 1.5,
-                        opacity: 0.9,
-                        fillOpacity: 0.85
-                    }).addTo(threatMap);
-
-                    const popup = `
-                        <div style="font-family: 'Inter', sans-serif; font-size: 0.8rem; line-height: 1.4;">
-                            <div style="font-weight: 700; color: ${color}; text-transform: uppercase;">[${m.severity.toUpperCase()}] Alert #${m.alert_id}</div>
-                            <div style="font-family: monospace; font-weight: 600; color: #fff; margin-top: 4px;">${m.indicator}</div>
-                            <div style="color: #9CA3AF; font-size: 0.75rem;">Origin: <strong>${m.country}</strong></div>
-                            <div style="color: #60A5FA; font-size: 0.72rem; margin-top: 2px;">Threat Score: ${m.score}/100</div>
-                        </div>
-                    `;
-                    marker.bindPopup(popup);
+        if (preloadedMarkers && preloadedMarkers.length > 0) {
+            plotMarkers(preloadedMarkers);
+        } else {
+            fetch('/api/threat-map')
+                .then(res => res.json())
+                .then(data => {
+                    plotMarkers(data && data.markers ? data.markers : []);
+                })
+                .catch(() => {
+                    if (emptyState) emptyState.style.display = 'block';
                 });
-            }
-        })
-        .catch(err => console.error("Could not load threat map data:", err));
+        }
+
+        setTimeout(() => {
+            threatMap.invalidateSize();
+        }, 300);
+
+        window.addEventListener('resize', () => {
+            threatMap.invalidateSize();
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', initThreatMap);
 </script>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 {% endblock %}

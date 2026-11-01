@@ -3,7 +3,28 @@
 {% block title %}SENTINEL // Incident Management{% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-center justify-content-between mb-4">
+<!-- Flash Notification Banner -->
+{% if flash_msg %}
+<div class="alert alert-success d-flex align-items-center justify-content-between border-0 bg-success-subtle text-success py-2 px-3 mb-4 rounded-3 shadow-sm alert-dismissible fade show" role="alert">
+    <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-check-circle-fill fs-5 flex-shrink-0"></i>
+        <span class="fw-semibold">{{ flash_msg }}</span>
+    </div>
+    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+{% endif %}
+
+{% if flash_error %}
+<div class="alert alert-danger d-flex align-items-center justify-content-between border-0 bg-danger-subtle text-danger py-2 px-3 mb-4 rounded-3 shadow-sm alert-dismissible fade show" role="alert">
+    <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-exclamation-triangle-fill fs-5 flex-shrink-0"></i>
+        <span class="fw-semibold">{{ flash_error }}</span>
+    </div>
+    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+{% endif %}
+
+<div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
     <div>
         <h3 class="fw-bold mb-1"><i class="bi bi-folder-check text-warning me-2"></i>Incident Cases</h3>
         <p class="text-secondary small mb-0">Track and coordinate multi-alert security investigations and containment actions.</p>
@@ -18,66 +39,237 @@
     </div>
 </div>
 
+<!-- Navigation Tabs: Active Cases vs Deleted Cases -->
+<ul class="nav nav-pills mb-3 gap-2">
+    <li class="nav-item">
+        <a class="nav-link {% if active_tab == 'active' %}active bg-primary{% else %}text-secondary bg-dark border border-secondary{% endif %} py-1 px-3 small fw-semibold" href="/incidents?tab=active">
+            <i class="bi bi-folder2-open me-1"></i> Active Cases ({{ active_count }})
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if active_tab == 'deleted' %}active bg-danger{% else %}text-secondary bg-dark border border-secondary{% endif %} py-1 px-3 small fw-semibold" href="/incidents?tab=deleted">
+            <i class="bi bi-archive me-1"></i> Deleted Cases ({{ deleted_count }})
+        </a>
+    </li>
+</ul>
+
 <div class="card card-soc">
-    <div class="card-soc-header">
-        <span class="fw-semibold small text-uppercase" style="letter-spacing: 0.05em;">Incident Response Ledger</span>
+    <div class="card-soc-header d-flex align-items-center justify-content-between">
+        <span class="fw-semibold small text-uppercase" style="letter-spacing: 0.05em;">
+            {% if active_tab == 'deleted' %}
+            <i class="bi bi-archive text-danger me-1"></i> Archived / Deleted Cases
+            {% else %}
+            <i class="bi bi-journal-medical text-info me-1"></i> Active Incident Response Ledger
+            {% endif %}
+        </span>
+        <span class="text-muted small font-mono">
+            {% if active_tab == 'deleted' %}Total Archived: {{ deleted_count }}{% else %}Total Cases: {{ active_count }}{% endif %}
+        </span>
     </div>
-    <div class="table-responsive">
-        <table class="table table-soc mb-0">
+
+    {% if active_tab == 'deleted' %}
+    <!-- DELETED CASES LEDGER -->
+    <div class="table-responsive" style="overflow-x: clip;">
+        <table class="table table-soc mb-0 align-middle" style="table-layout: fixed; width: 100%;">
             <thead>
                 <tr>
-                    <th style="width: 80px;">ID</th>
-                    <th>Incident Title</th>
-                    <th>Severity</th>
-                    <th>Status</th>
-                    <th>Linked Alerts</th>
-                    <th>Created</th>
-                    <th>Actions</th>
+                    <th style="width: 5%;">ID</th>
+                    <th style="width: 35%;">Incident Title</th>
+                    <th style="width: 10%; text-align: center;">Severity</th>
+                    <th style="width: 12%; text-align: center;">Prior Status</th>
+                    <th style="width: 14%; text-align: center;">Deleted At</th>
+                    <th style="width: 11%; text-align: center;">Deleted By</th>
+                    <th style="width: 13%; text-align: right;">Action</th>
                 </tr>
             </thead>
             <tbody>
                 {% for inc in incidents %}
                 <tr>
                     <td class="font-mono text-muted">#{{ inc.id }}</td>
-                    <td>
-                        <a href="/incidents/{{ inc.id }}" class="text-decoration-none fw-semibold text-white">
+                    <td style="overflow: hidden; text-overflow: ellipsis;">
+                        <span class="fw-semibold text-white d-block text-truncate" title="{{ inc.title }}">
                             {{ inc.title }}
-                        </a>
+                        </span>
                         {% if inc.description %}
-                        <div class="text-muted small text-truncate" style="max-width: 380px;">{{ inc.description }}</div>
+                        <div class="text-muted small text-truncate" title="{{ inc.description }}">{{ inc.description }}</div>
                         {% endif %}
                     </td>
-                    <td>
-                        <span class="badge badge-severity-{{ inc.severity }}">{{ inc.severity }}</span>
+                    <td class="text-center">
+                        <span class="badge badge-severity-{{ inc.severity }}">{{ inc.severity|upper }}</span>
                     </td>
-                    <td>
-                        <span class="badge {% if inc.status in ['open', 'investigating'] %}bg-danger{% elif inc.status == 'contained' %}bg-warning text-dark{% else %}bg-success{% endif %}">
-                            {{ inc.status|upper }}
-                        </span>
+                    <td class="text-center">
+                        <span class="badge bg-secondary font-mono">{{ inc.status|upper }}</span>
                     </td>
-                    <td>
-                        <span class="badge bg-dark border border-secondary font-mono">{{ inc.alerts|length }} Alerts</span>
+                    <td class="font-mono text-muted small text-center">
+                        {{ inc.deleted_at.strftime('%Y-%m-%d %H:%M') if inc.deleted_at else '--' }}
                     </td>
-                    <td class="font-mono text-muted small">
-                        {{ inc.created_at.strftime('%Y-%m-%d %H:%M') if inc.created_at else '--' }}
+                    <td class="text-muted small text-center">
+                        <i class="bi bi-person me-1"></i>{{ inc.deleted_by or 'admin' }}
                     </td>
-                    <td>
-                        <a href="/incidents/{{ inc.id }}" class="btn btn-xs btn-outline-info">
-                            <i class="bi bi-eye"></i> Investigate
-                        </a>
+                    <td style="text-align: right;">
+                        <button type="button" class="btn btn-xs btn-outline-success" data-bs-toggle="modal" data-bs-target="#restoreModal{{ inc.id }}" title="Restore Incident">
+                            <i class="bi bi-arrow-counterclockwise me-1"></i> Restore
+                        </button>
                     </td>
                 </tr>
+
+                <!-- Modal: Confirm Restore -->
+                <div class="modal fade" id="restoreModal{{ inc.id }}" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content bg-dark border border-success text-white shadow-lg">
+                            <div class="modal-header border-secondary bg-success bg-opacity-10">
+                                <h5 class="modal-title fs-6 text-success">
+                                    <i class="bi bi-arrow-counterclockwise me-2"></i>Restore Security Incident
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="p-3 mb-3 rounded bg-surface border border-secondary">
+                                    <div class="text-secondary small text-uppercase fw-semibold mb-1">Target Incident</div>
+                                    <div class="fw-bold fs-6 text-white">#{{ inc.id }} – {{ inc.title }}</div>
+                                    <div class="d-flex align-items-center gap-2 mt-2">
+                                        <span class="badge badge-severity-{{ inc.severity }}">{{ inc.severity|upper }}</span>
+                                        <span class="badge bg-secondary font-mono">{{ inc.status|upper }}</span>
+                                        <span class="badge bg-dark border border-secondary font-mono">{{ inc.alerts|length }} Alerts</span>
+                                    </div>
+                                </div>
+                                <p class="text-secondary small mb-0">
+                                    Restoring this incident will return it to the active <strong>Incident Cases</strong> ledger. All previous investigation notes, severity assessments, and linked alerts will be fully restored.
+                                </p>
+                            </div>
+                            <div class="modal-footer border-secondary">
+                                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <form action="/incidents/{{ inc.id }}/restore" method="POST" class="d-inline mb-0">
+                                    <button type="submit" class="btn btn-sm btn-success px-3">
+                                        <i class="bi bi-arrow-counterclockwise me-1"></i> Confirm Restore
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 {% else %}
                 <tr>
                     <td colspan="7" class="text-center py-4 text-muted">
-                        <i class="bi bi-check-circle fs-3 d-block mb-2 text-success"></i>
-                        No incident cases registered yet. Incidents can be opened manually or grouped from security alerts.
+                        <i class="bi bi-archive fs-3 d-block mb-2 text-secondary"></i>
+                        No archived or deleted incidents. All registered cases are currently active.
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
+
+    {% else %}
+    <!-- ACTIVE CASES LEDGER -->
+    <div class="table-responsive" style="overflow-x: clip;">
+        <table class="table table-soc mb-0 align-middle" style="table-layout: fixed; width: 100%;">
+            <thead>
+                <tr>
+                    <th style="width: 5%; padding-left: 0.5rem; padding-right: 0.5rem;">ID</th>
+                    <th style="width: 32%; padding-left: 0.5rem; padding-right: 0.5rem;">Incident Title</th>
+                    <th style="width: 10%; text-align: center; white-space: nowrap; padding-left: 0.3rem; padding-right: 0.3rem;">Severity</th>
+                    <th style="width: 11%; text-align: center; white-space: nowrap; padding-left: 0.3rem; padding-right: 0.3rem;">Status</th>
+                    <th style="width: 11%; text-align: center; white-space: nowrap; padding-left: 0.3rem; padding-right: 0.3rem;">Linked Alerts</th>
+                    <th style="width: 14%; text-align: center; white-space: nowrap; padding-left: 0.3rem; padding-right: 0.3rem;">Created</th>
+                    <th style="width: 17%; text-align: right; white-space: nowrap; padding-left: 0.3rem; padding-right: 0.75rem;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for inc in incidents %}
+                <tr>
+                    <td class="font-mono text-muted" style="padding-left: 0.5rem; padding-right: 0.5rem;">#{{ inc.id }}</td>
+                    <td style="overflow: hidden; text-overflow: ellipsis; padding-left: 0.5rem; padding-right: 0.5rem;">
+                        <a href="/incidents/{{ inc.id }}" class="text-decoration-none fw-semibold text-white d-block text-truncate" title="{{ inc.title }}">
+                            {{ inc.title }}
+                        </a>
+                        {% if inc.description %}
+                        <div class="text-muted small text-truncate" title="{{ inc.description }}">{{ inc.description }}</div>
+                        {% endif %}
+                    </td>
+                    <td class="text-center" style="padding-left: 0.3rem; padding-right: 0.3rem;">
+                        <span class="badge badge-severity-{{ inc.severity }}">{{ inc.severity|upper }}</span>
+                    </td>
+                    <td class="text-center" style="padding-left: 0.3rem; padding-right: 0.3rem;">
+                        <span class="badge {% if inc.status in ['open', 'investigating'] %}bg-danger{% elif inc.status == 'contained' %}bg-warning text-dark{% else %}bg-success{% endif %}">
+                            {{ inc.status|upper }}
+                        </span>
+                    </td>
+                    <td class="text-center" style="padding-left: 0.3rem; padding-right: 0.3rem;">
+                        <span class="badge bg-dark border border-secondary font-mono">{{ inc.alerts|length }} Alerts</span>
+                    </td>
+                    <td class="font-mono text-muted small text-center" style="white-space: nowrap; padding-left: 0.3rem; padding-right: 0.3rem;">
+                        {{ inc.created_at.strftime('%Y-%m-%d %H:%M') if inc.created_at else '--' }}
+                    </td>
+                    <td style="text-align: right; white-space: nowrap; padding-left: 0.3rem; padding-right: 0.5rem;">
+                        <div class="d-inline-flex align-items-center gap-1 justify-content-end">
+                            <a href="/incidents/{{ inc.id }}" class="btn btn-xs btn-outline-info" title="Investigate Incident">
+                                <i class="bi bi-eye me-1"></i> Investigate
+                            </a>
+                            <button type="button" class="btn btn-xs btn-outline-danger px-2" data-bs-toggle="modal" data-bs-target="#deleteIncidentModal{{ inc.id }}" title="Delete Incident">
+                                <i class="bi bi-trash3"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+
+                <!-- Modal: Confirm Delete for Incident #{{ inc.id }} -->
+                <div class="modal fade" id="deleteIncidentModal{{ inc.id }}" tabindex="-1" aria-labelledby="deleteModalLabel{{ inc.id }}" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content bg-dark border border-danger text-white shadow-lg">
+                            <div class="modal-header border-secondary bg-danger bg-opacity-10">
+                                <h5 class="modal-title fs-6 text-danger" id="deleteModalLabel{{ inc.id }}">
+                                    <i class="bi bi-exclamation-triangle-fill me-2"></i>Confirm Incident Deletion
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="p-3 mb-3 rounded bg-surface border border-secondary">
+                                    <div class="text-secondary small text-uppercase fw-semibold mb-1">Target Incident Case</div>
+                                    <div class="fw-bold fs-6 text-white mb-1">#{{ inc.id }} – {{ inc.title }}</div>
+                                    <div class="d-flex align-items-center gap-2 mt-2">
+                                        <span class="badge badge-severity-{{ inc.severity }}">{{ inc.severity|upper }}</span>
+                                        <span class="badge bg-secondary font-mono">{{ inc.alerts|length }} Linked Alerts</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="alert alert-warning border-0 bg-warning bg-opacity-10 text-warning py-2 px-3 mb-3 small" role="alert">
+                                    <i class="bi bi-info-circle-fill me-1"></i>
+                                    <strong>Notice:</strong> This incident will be removed from the active Incident Cases ledger.
+                                </div>
+
+                                <div class="text-secondary small">
+                                    <p class="mb-1"><i class="bi bi-shield-check text-success me-1"></i> <strong>Evidence Preservation Guarantee:</strong></p>
+                                    <ul class="ps-3 mb-0 text-muted">
+                                        <li>Associated security alerts remain completely preserved.</li>
+                                        <li>Original security log events and forensic telemetry are untouched.</li>
+                                        <li>This incident can be restored at any time from Deleted Cases.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <div class="modal-footer border-secondary">
+                                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <form action="/incidents/{{ inc.id }}/delete" method="POST" class="d-inline mb-0">
+                                    <button type="submit" class="btn btn-sm btn-danger px-3">
+                                        <i class="bi bi-trash3 me-1"></i> Confirm Delete
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center py-4 text-muted">
+                        <i class="bi bi-check-circle fs-3 d-block mb-2 text-success"></i>
+                        No active incident cases registered yet. Incidents can be opened manually or grouped from security alerts.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
 </div>
 
 <!-- Modal: Create Incident -->

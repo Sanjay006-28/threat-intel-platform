@@ -39,12 +39,12 @@
             <select name="status" class="form-select form-select-sm bg-dark border-secondary text-white font-mono">
                 <option value="all" {% if selected_status == 'all' %}selected{% endif %}>All Statuses</option>
                 <option value="active" {% if selected_status == 'active' %}selected{% endif %}>Active Threats</option>
-                <option value="inactive" {% if selected_status == 'inactive' %}selected{% endif %}>Deactivated / Expired</option>
+                <option value="inactive" {% if selected_status in ['inactive', 'deactivated', 'expired'] %}selected{% endif %}>Deactivated / Expired</option>
             </select>
         </div>
         <div class="col-md-2 d-flex gap-2">
-            <button type="submit" class="btn btn-sm btn-primary w-100">Filter</button>
-            <a href="/iocs" class="btn btn-sm btn-outline-secondary" title="Reset Filters"><i class="bi bi-arrow-clockwise"></i></a>
+            <button type="submit" class="btn btn-sm btn-primary w-100"><i class="bi bi-funnel me-1"></i>Filter</button>
+            <a href="/iocs" class="btn btn-sm btn-outline-secondary" title="Reset Filters" aria-label="Reset Filters"><i class="bi bi-arrow-clockwise"></i></a>
         </div>
     </form>
 </div>
@@ -56,16 +56,16 @@
     </span>
     <!-- Pagination -->
     {% if total_pages > 1 %}
-    <nav>
+    <nav aria-label="Indicator Repository Pagination">
         <ul class="pagination pagination-sm mb-0">
-            <li class="page-item {% if current_page <= 1 %}disabled{% endif %}">
-                <a class="page-link bg-dark border-secondary text-white" href="/iocs?page={{ current_page - 1 }}&q={{ search_query }}&type={{ selected_type }}&status={{ selected_status }}">Previous</a>
+            <li class="page-item {% if current_page <= 1 or not prev_page_url %}disabled{% endif %}">
+                <a class="page-link bg-dark border-secondary text-white" href="{{ prev_page_url or '#' }}" {% if current_page <= 1 %}tabindex="-1" aria-disabled="true"{% endif %}>Previous</a>
             </li>
             <li class="page-item disabled">
-                <span class="page-link bg-dark border-secondary text-info">{{ current_page }} / {{ total_pages }}</span>
+                <span class="page-link bg-dark border-secondary text-info fw-semibold">{{ current_page }} / {{ total_pages }}</span>
             </li>
-            <li class="page-item {% if current_page >= total_pages %}disabled{% endif %}">
-                <a class="page-link bg-dark border-secondary text-white" href="/iocs?page={{ current_page + 1 }}&q={{ search_query }}&type={{ selected_type }}&status={{ selected_status }}">Next</a>
+            <li class="page-item {% if current_page >= total_pages or not next_page_url %}disabled{% endif %}">
+                <a class="page-link bg-dark border-secondary text-white" href="{{ next_page_url or '#' }}" {% if current_page >= total_pages %}tabindex="-1" aria-disabled="true"{% endif %}>Next</a>
             </li>
         </ul>
     </nav>
@@ -96,7 +96,7 @@
                         <span class="badge bg-secondary font-mono">{{ ioc.type }}</span>
                     </td>
                     <td>
-                        <a href="/iocs/{{ ioc.id }}" class="text-decoration-none font-mono fw-semibold text-info text-break">
+                        <a href="/iocs/{{ ioc.id }}?return_to={{ current_filter_url | urlencode }}" class="text-decoration-none font-mono fw-semibold text-info text-break">
                             {{ ioc.value }}
                         </a>
                         {% if ioc.description %}
@@ -126,7 +126,7 @@
                         {% endif %}
                     </td>
                     <td>
-                        <a href="/iocs/{{ ioc.id }}" class="btn btn-xs btn-outline-info">
+                        <a href="/iocs/{{ ioc.id }}?return_to={{ current_filter_url | urlencode }}" class="btn btn-xs btn-outline-info">
                             <i class="bi bi-eye"></i> View
                         </a>
                     </td>

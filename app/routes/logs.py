@@ -80,7 +80,9 @@ def list_logs(request: Request, db: Session = Depends(get_db)):
 @router.post("/logs/run-demo")
 def run_demo_log(request: Request, db: Session = Depends(get_db)):
     """Runs the built-in demo_security.log file with batch processing."""
-    demo_file = "demo_security.log"
+    demo_file = os.path.join("demo_logs", "demo_security.log")
+    if not os.path.exists(demo_file):
+        demo_file = "demo_security.log"
     if not os.path.exists(demo_file):
         return RedirectResponse(url="/logs", status_code=303)
 

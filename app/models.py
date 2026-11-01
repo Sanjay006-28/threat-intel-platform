@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text, JSON
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, validates
 from datetime import datetime, timezone
 from app.database import Base
 
@@ -47,6 +47,7 @@ class Feed(Base):
     interval_minutes = Column(Integer, default=360)
     last_run_status = Column(String(50), nullable=True)
     last_run_at = Column(DateTime, nullable=True)
+    last_successful_sync = Column(DateTime, nullable=True)
     
     runs = relationship("FeedRun", back_populates="feed", cascade="all, delete-orphan")
 
@@ -62,6 +63,7 @@ class FeedRun(Base):
     records_fetched = Column(Integer, default=0)
     new_records = Column(Integer, default=0)
     updated_records = Column(Integer, default=0)
+    duplicate_records = Column(Integer, default=0)
     error_message = Column(Text, nullable=True)
     
     feed = relationship("Feed", back_populates="runs")
@@ -105,6 +107,9 @@ class Incident(Base):
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
     analyst_notes = Column(Text, nullable=True)
     resolution_summary = Column(Text, nullable=True)
+    is_deleted = Column(Boolean, default=False, nullable=False, index=True)
+    deleted_at = Column(DateTime, nullable=True)
+    deleted_by = Column(String(100), nullable=True)
 
     alerts = relationship("Alert", back_populates="incident")
 
@@ -132,16 +137,27 @@ class Alert(Base):
     log_event = relationship("LogEvent", back_populates="alerts")
     incident = relationship("Incident", back_populates="alerts")
 
+    @validates('score')
+    def validate_score(self, key, value):
+        if value is not None:
+            return max(0, min(100, int(value)))
+        return 0
+
 
 class Whitelist(Base):
     __tablename__ = "whitelist"
     
     id = Column(Integer, primary_key=True, index=True)
-    type = Column(String(50), nullable=False)
+    type = Column(String(50), nullable=False) # ipv4, ipv6, cidr, domain, url, md5, sha1, sha256
     value = Column(String(1024), nullable=False, unique=True)
     description = Column(Text, nullable=True)
     reason = Column(String(255), nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
+    is_deleted = Column(Boolean, default=False, nullable=False, index=True)
+    created_by = Column(String(100), default="system", nullable=True)
     created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+    expires_at = Column(DateTime, nullable=True)
 
 
 class User(Base):

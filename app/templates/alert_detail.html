@@ -1,222 +1,430 @@
 {% extends "base.html" %}
 
-{% block title %}SENTINEL // Alert #{{ alert.id }} - {{ alert.matched_value }}{% endblock %}
+{% block title %}Alert #{{ alert.id }} // {{ alert.matched_value }} // SENTINEL CTI{% endblock %}
 
 {% block content %}
 <div class="mb-4">
-    <a href="/alerts" class="btn btn-sm btn-outline-secondary mb-3">
-        <i class="bi bi-arrow-left me-1"></i> Back to Alerts
-    </a>
-    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-        <div>
-            <div class="d-flex align-items-center gap-2 mb-1">
-                <span class="badge bg-secondary font-mono">ALERT #{{ alert.id }}</span>
-                <span class="badge badge-severity-{{ alert.severity }}">{{ alert.severity|upper }}</span>
-                <span class="badge bg-dark border border-secondary font-mono">RISK SCORE: {{ alert.score }}/100</span>
-                <span class="badge bg-info-subtle text-info font-mono">{{ alert.hit_count or 1 }}x OCCURRENCES</span>
-            </div>
-            <h3 class="fw-bold font-mono text-white mb-0">{{ alert.matched_value }}</h3>
-        </div>
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+        <a href="/alerts" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1 font-mono" style="font-size: 0.8rem;">
+            <i class="bi bi-arrow-left"></i>
+            <span>Back to Alerts</span>
+        </a>
         <div class="d-flex align-items-center gap-2">
-            <a href="/alerts/{{ alert.id }}/report" target="_blank" class="btn btn-sm btn-outline-info">
+            <button type="button" class="btn btn-sm btn-outline-secondary font-mono" style="font-size: 0.8rem;" onclick="copyIocValue('{{ alert.matched_value }}', this)">
+                <i class="bi bi-clipboard me-1"></i><span>Copy IOC</span>
+            </button>
+            <a href="/alerts/{{ alert.id }}/report" target="_blank" class="btn btn-sm btn-outline-info font-mono" style="font-size: 0.8rem;">
                 <i class="bi bi-file-earmark-text me-1"></i> Printable Report
             </a>
+        </div>
+    </div>
+
+    <!-- Top Investigation Banner -->
+    <div class="p-3 rounded-3 border bg-surface" style="background: var(--bg-surface); border-color: var(--border-subtle) !important;">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span class="badge bg-secondary font-mono" style="font-size: 0.75rem;">ALERT #{{ alert.id }}</span>
+                <span class="badge badge-severity-{{ alert.severity }}" style="font-size: 0.75rem;">{{ alert.severity|upper }}</span>
+                <span class="badge bg-dark border border-secondary font-mono text-white" style="font-size: 0.75rem;">
+                    RISK SCORE: <strong class="text-danger">{{ alert.score }}/100</strong>
+                </span>
+                <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 font-mono" style="font-size: 0.75rem;">
+                    <i class="bi bi-stack me-1"></i>{{ alert.hit_count or 1 }}x OCCURRENCES
+                </span>
+                <span class="badge bg-{{ provenance_badge }} bg-opacity-10 text-{{ provenance_badge }} border border-{{ provenance_badge }} border-opacity-25 font-mono" style="font-size: 0.75rem;">
+                    <i class="bi {% if is_demonstration_ioc %}bi-flask{% else %}bi-shield-check{% endif %} me-1"></i>{{ provenance_label }}
+                </span>
+            </div>
+            <div>
+                <span class="badge {% if alert.status == 'new' %}bg-danger bg-opacity-25 text-danger border border-danger{% elif alert.status == 'investigating' %}bg-warning bg-opacity-25 text-warning border border-warning{% elif alert.status == 'resolved' %}bg-success bg-opacity-25 text-success border border-success{% else %}bg-secondary{% endif %} font-mono text-uppercase" style="font-size: 0.72rem;">
+                    STATUS: {{ alert.status }}
+                </span>
+            </div>
+        </div>
+        <div class="d-flex align-items-baseline gap-2">
+            <h3 class="fw-bold font-mono text-white mb-0 text-break" style="letter-spacing: -0.02em;">{{ alert.matched_value }}</h3>
+        </div>
+        <div class="d-flex align-items-center gap-3 mt-2 text-secondary small font-mono flex-wrap" style="font-size: 0.75rem;">
+            <span><strong class="text-white">TYPE:</strong> {{ alert.matched_type|upper }}</span>
+            <span class="text-muted">|</span>
+            <span><strong class="text-white">AFFECTED HOST:</strong> <span class="text-info">{{ endpoint }}</span></span>
+            <span class="text-muted">|</span>
+            <span><strong class="text-white">DEDUPE KEY:</strong> <span class="text-muted" title="{{ alert.dedupe_key }}">{{ alert.dedupe_key[:12] }}...</span></span>
         </div>
     </div>
 </div>
 
 <div class="row g-4">
-    <!-- Left Column: Evidence, Enrichment, Scoring & MITRE -->
+    <!-- Left Column: Evidence, Timestamps, Enrichment, Scoring & MITRE -->
     <div class="col-lg-8">
-        <!-- Matched Raw Log Evidence -->
+
+        <!-- 1. Precision Multi-Tier Timestamps Strip (Requirement 3) -->
         <div class="card card-soc mb-4">
-            <div class="card-soc-header">
-                <span class="fw-semibold small text-uppercase"><i class="bi bi-terminal me-2 text-info"></i>Raw Security Log Evidence</span>
+            <div class="card-soc-header py-2 px-3 d-flex align-items-center justify-content-between">
+                <span class="fw-semibold small text-uppercase font-mono text-white">
+                    <i class="bi bi-clock-history me-2 text-info"></i>Precision Telemetry & Detection Timeline (UTC)
+                </span>
+                <span class="badge bg-dark border border-secondary font-mono text-muted" style="font-size: 0.68rem;">
+                    SYNCHRONIZED AUDIT CLOCK
+                </span>
             </div>
-            <div class="card-body">
-                <div class="p-3 bg-dark rounded border border-secondary font-mono text-break small mb-3" style="color: #6EE7B7; background: #070B14 !important;">
-                    {{ log_event.raw_line if log_event else 'Direct artifact correlation' }}
-                </div>
+            <div class="card-body p-3">
                 <div class="row g-2 text-secondary small">
-                    <div class="col-md-4">
-                        <span class="text-muted">Extracted Type:</span> <strong class="text-white">{{ alert.matched_type }}</strong>
+                    <!-- 1. Source Event Time -->
+                    <div class="col-12 col-sm-6 col-md-3">
+                        <div class="p-2 rounded bg-dark border border-secondary" style="background: rgba(15, 23, 42, 0.6) !important;">
+                            <span class="text-muted d-block" style="font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em;">1. Source Event Time</span>
+                            <strong class="text-white font-mono d-block mt-1" style="font-size: 0.78rem;">
+                                {{ source_event_time.strftime('%Y-%m-%d %H:%M:%S UTC') if source_event_time else 'From log header: --' }}
+                            </strong>
+                            <small class="text-secondary" style="font-size: 0.65rem;">Origin device wall-clock</small>
+                        </div>
                     </div>
-                    <div class="col-md-4">
-                        <span class="text-muted">First Detected:</span> <span class="font-mono text-white">{{ alert.first_seen.strftime('%Y-%m-%d %H:%M:%S UTC') if alert.first_seen else '--' }}</span>
+                    <!-- 2. Log File Ingested -->
+                    <div class="col-12 col-sm-6 col-md-3">
+                        <div class="p-2 rounded bg-dark border border-secondary" style="background: rgba(15, 23, 42, 0.6) !important;">
+                            <span class="text-muted d-block" style="font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em;">2. Ingestion Time</span>
+                            <strong class="text-info font-mono d-block mt-1" style="font-size: 0.78rem;">
+                                {{ ingestion_time.strftime('%Y-%m-%d %H:%M:%S UTC') if ingestion_time else '--' }}
+                            </strong>
+                            <small class="text-secondary text-truncate d-block" style="font-size: 0.65rem;" title="{{ log_event.log_file.filename if log_event and log_event.log_file else 'Direct' }}">
+                                File: {{ log_event.log_file.filename if log_event and log_event.log_file else 'Direct' }}
+                            </small>
+                        </div>
                     </div>
-                    <div class="col-md-4">
-                        <span class="text-muted">Last Observed:</span> <span class="font-mono text-white">{{ alert.last_seen.strftime('%Y-%m-%d %H:%M:%S UTC') if alert.last_seen else '--' }}</span>
+                    <!-- 3. First Correlated -->
+                    <div class="col-12 col-sm-6 col-md-3">
+                        <div class="p-2 rounded bg-dark border border-secondary" style="background: rgba(15, 23, 42, 0.6) !important;">
+                            <span class="text-muted d-block" style="font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em;">3. First Detected</span>
+                            <strong class="text-warning font-mono d-block mt-1" style="font-size: 0.78rem;">
+                                {{ first_seen_time.strftime('%Y-%m-%d %H:%M:%S UTC') if first_seen_time else '--' }}
+                            </strong>
+                            <small class="text-secondary" style="font-size: 0.65rem;">Engine correlation hit</small>
+                        </div>
+                    </div>
+                    <!-- 4. Last Observed -->
+                    <div class="col-12 col-sm-6 col-md-3">
+                        <div class="p-2 rounded bg-dark border border-secondary" style="background: rgba(15, 23, 42, 0.6) !important;">
+                            <span class="text-muted d-block" style="font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em;">4. Last Observed</span>
+                            <strong class="text-white font-mono d-block mt-1" style="font-size: 0.78rem;">
+                                {{ last_seen_time.strftime('%Y-%m-%d %H:%M:%S UTC') if last_seen_time else '--' }}
+                            </strong>
+                            <small class="text-secondary" style="font-size: 0.65rem;">Latest group activity</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Raw Security Log Evidence & Scoped Group Occurrences (Requirement 2) -->
+        <div class="card card-soc mb-4">
+            <div class="card-soc-header py-2 px-3 d-flex align-items-center justify-content-between">
+                <span class="fw-semibold small text-uppercase font-mono text-white">
+                    <i class="bi bi-terminal me-2 text-info"></i>Triggering Security Log Evidence
+                </span>
+                <span class="badge bg-secondary font-mono" style="font-size: 0.68rem;">EVENT ID: #{{ log_event.id if log_event else 'N/A' }}</span>
+            </div>
+            <div class="card-body p-3">
+                <div class="p-3 rounded border font-mono text-break small mb-3" style="color: #6EE7B7; background: #070B14; border-color: rgba(255,255,255,0.08) !important; font-size: 0.82rem; line-height: 1.5;">
+                    {{ log_event.raw_line if log_event else 'Direct artifact correlation event.' }}
+                </div>
+
+                <!-- Aggregated Evidence History Scoped Strictly to This Alert's Aggregation Group -->
+                <div class="mt-3 pt-3 border-top" style="border-color: rgba(255,255,255,0.08) !important;">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="text-white small fw-semibold">
+                            <i class="bi bi-stack me-1 text-info"></i>Aggregated Evidence History 
+                            <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 font-mono ms-1" style="font-size: 0.68rem;">
+                                {{ alert_evidence_events|length }} Group Event{% if alert_evidence_events|length != 1 %}s{% endif %}
+                            </span>
+                        </span>
+                        <small class="text-muted font-mono" style="font-size: 0.68rem;">Matching Host: {{ endpoint }}</small>
+                    </div>
+
+                    <div class="list-group list-group-flush bg-transparent">
+                        {% for ev in alert_evidence_events %}
+                        <div class="list-group-item bg-transparent text-secondary border-secondary px-0 py-2 small font-mono d-flex align-items-start gap-2" style="border-color: rgba(255,255,255,0.06) !important;">
+                            <span class="badge bg-dark border border-secondary text-info" style="font-size: 0.68rem;">#{{ ev.id }}</span>
+                            <div class="flex-grow-1 text-break">
+                                <span class="text-white-50">{{ ev.raw_line }}</span>
+                            </div>
+                        </div>
+                        {% endfor %}
                     </div>
                 </div>
 
-                {% if related_events and related_events|length > 1 %}
-                <div class="mt-3 pt-3 border-top border-secondary">
-                    <span class="text-muted small fw-semibold d-block mb-2"><i class="bi bi-stack me-1"></i>Aggregated Evidence Log History (Recent {{ related_events|length }} Events):</span>
+                <!-- Cross-Alert Platform Occurrences (No Discarded Evidence, Accurate Attribution) -->
+                {% if correlated_platform_events and correlated_platform_events|length > 0 %}
+                <div class="mt-3 pt-3 border-top" style="border-color: rgba(255,255,255,0.08) !important;">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="text-secondary small fw-semibold">
+                            <i class="bi bi-diagram-2 me-1 text-warning"></i>Correlated Indicator Activity Across Other Detections
+                            <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 font-mono ms-1" style="font-size: 0.68rem;">
+                                {{ correlated_platform_events|length }} Additional Occurrence{% if correlated_platform_events|length != 1 %}s{% endif %}
+                            </span>
+                        </span>
+                        <small class="text-muted" style="font-size: 0.68rem;">Cross-Campaign Audit Trail</small>
+                    </div>
+                    <p class="text-muted small mb-2" style="font-size: 0.72rem;">
+                        This indicator was also detected in distinct ingestion runs or separate deduplication time windows. These records are cataloged in their respective alert cases:
+                    </p>
                     <div class="list-group list-group-flush bg-transparent">
-                        {% for ev in related_events %}
-                        <div class="list-group-item bg-transparent text-secondary border-secondary px-0 py-1 small font-mono">
-                            <span class="text-info me-2">#{{ ev.id }} [{{ ev.timestamp.strftime('%H:%M:%S') if ev.timestamp else 'recent' }}]</span>
-                            <span class="text-white-50 text-break">{{ ev.raw_line[:140] }}{% if ev.raw_line|length > 140 %}...{% endif %}</span>
+                        {% for item in correlated_platform_events %}
+                        <div class="list-group-item bg-transparent text-secondary px-0 py-2 small font-mono d-flex align-items-center justify-content-between flex-wrap gap-2" style="border-color: rgba(255,255,255,0.06) !important; font-size: 0.72rem;">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge bg-dark border border-secondary text-muted">LogEvent #{{ item.event.id }}</span>
+                                <span class="text-white-50 text-truncate" style="max-width: 320px;" title="{{ item.event.raw_line }}">{{ item.event.raw_line }}</span>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="text-muted">Host: {{ item.endpoint }}</span>
+                                {% if item.associated_alert %}
+                                <a href="/alerts/{{ item.associated_alert.id }}" class="badge bg-info bg-opacity-15 text-info border border-info border-opacity-25 text-decoration-none">
+                                    View Alert #{{ item.associated_alert.id }} &rarr;
+                                </a>
+                                {% else %}
+                                <span class="badge bg-dark text-muted">Direct Ingestion</span>
+                                {% endif %}
+                            </div>
                         </div>
                         {% endfor %}
                     </div>
                 </div>
                 {% endif %}
+
             </div>
         </div>
 
-        <!-- Threat Intelligence Enrichment Context -->
+        <!-- 3. Threat Intelligence Enrichment Context -->
         <div class="card card-soc mb-4">
-            <div class="card-soc-header">
-                <span class="fw-semibold small text-uppercase"><i class="bi bi-globe me-2 text-primary"></i>Threat Intelligence & Network Context</span>
+            <div class="card-soc-header py-2 px-3">
+                <span class="fw-semibold small text-uppercase font-mono text-white">
+                    <i class="bi bi-globe me-2 text-primary"></i>Network Geolocation & Enrichment Context
+                </span>
             </div>
-            <div class="card-body">
+            <div class="card-body p-3">
                 <div class="row g-3">
                     <div class="col-md-4">
-                        <div class="p-3 bg-dark rounded border border-secondary">
-                            <span class="text-muted small d-block">Origin Geolocation</span>
-                            <strong class="text-white">{{ enrichment.get('country', 'Unknown') }}</strong>
-                            <div class="text-muted small">{{ enrichment.get('city', 'Unknown') }}</div>
+                        <div class="p-3 rounded border border-secondary" style="background: rgba(15, 23, 42, 0.6) !important;">
+                            <span class="text-muted small d-block" style="font-size: 0.7rem; text-transform: uppercase;">Origin Geolocation</span>
+                            <strong class="text-white mt-1 d-block">{{ enrichment.get('country', 'Unknown') }}</strong>
+                            <div class="text-secondary small font-mono" style="font-size: 0.72rem;">{{ enrichment.get('city', 'Unknown') }}</div>
                         </div>
                     </div>
                     <div class="col-md-4">
-                        <div class="p-3 bg-dark rounded border border-secondary">
-                            <span class="text-muted small d-block">ISP / Autonomous System</span>
-                            <strong class="text-white text-truncate d-block">{{ enrichment.get('isp', 'Unknown') }}</strong>
-                            <div class="text-muted small font-mono">{{ enrichment.get('as_number', 'Unknown') }}</div>
+                        <div class="p-3 rounded border border-secondary" style="background: rgba(15, 23, 42, 0.6) !important;">
+                            <span class="text-muted small d-block" style="font-size: 0.7rem; text-transform: uppercase;">Autonomous System (ASN)</span>
+                            <strong class="text-white text-truncate d-block mt-1">{{ enrichment.get('isp', 'Unknown') }}</strong>
+                            <div class="text-secondary small font-mono" style="font-size: 0.72rem;">{{ enrichment.get('as_number', 'Unknown') }}</div>
                         </div>
                     </div>
                     <div class="col-md-4">
-                        <div class="p-3 bg-dark rounded border border-secondary">
-                            <span class="text-muted small d-block">Reverse DNS (PTR)</span>
-                            <strong class="text-white text-truncate d-block font-mono small">{{ enrichment.get('reverse_dns') or 'No PTR Record' }}</strong>
-                            <div class="text-muted small">Verified DNS PTR</div>
+                        <div class="p-3 rounded border border-secondary" style="background: rgba(15, 23, 42, 0.6) !important;">
+                            <span class="text-muted small d-block" style="font-size: 0.7rem; text-transform: uppercase;">Reverse DNS (PTR)</span>
+                            <strong class="text-white text-truncate d-block font-mono small mt-1">{{ enrichment.get('reverse_dns') or 'No PTR Record' }}</strong>
+                            <div class="text-secondary small" style="font-size: 0.72rem;">Verified Network Resolution</div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Explainable Threat Scoring Breakdown -->
+        <!-- 4. Explainable Threat Scoring Breakdown -->
         <div class="card card-soc mb-4">
-            <div class="card-soc-header">
-                <span class="fw-semibold small text-uppercase"><i class="bi bi-calculator me-2 text-warning"></i>Explainable Risk Score Model</span>
+            <div class="card-soc-header py-2 px-3 d-flex align-items-center justify-content-between">
+                <span class="fw-semibold small text-uppercase font-mono text-white">
+                    <i class="bi bi-calculator me-2 text-warning"></i>Explainable Threat Scoring Model
+                </span>
+                <span class="badge bg-dark border border-secondary font-mono text-muted" style="font-size: 0.68rem;">
+                    BOUNDED RANGE [0 - 100]
+                </span>
             </div>
-            <div class="card-body">
-                <div class="row g-3 text-center mb-3">
+            <div class="card-body p-3">
+                <div class="row g-2 text-center mb-3">
                     <div class="col-3">
-                        <div class="p-2 bg-dark rounded border border-secondary">
-                            <small class="text-muted d-block">Base Confidence</small>
-                            <span class="fs-5 fw-bold text-info">{{ score_breakdown.base_confidence }}</span>
+                        <div class="p-2 rounded border border-secondary" style="background: rgba(15, 23, 42, 0.6) !important;">
+                            <small class="text-muted d-block" style="font-size: 0.68rem; text-transform: uppercase;">Base Confidence</small>
+                            <span class="fs-5 fw-bold text-info font-mono">{{ score_breakdown.base_confidence }}</span>
                         </div>
                     </div>
                     <div class="col-3">
-                        <div class="p-2 bg-dark rounded border border-secondary">
-                            <small class="text-muted d-block">Feed Multiplier</small>
-                            <span class="fs-5 fw-bold text-primary">+{{ score_breakdown.feed_corroboration_bonus }}</span>
+                        <div class="p-2 rounded border border-secondary" style="background: rgba(15, 23, 42, 0.6) !important;">
+                            <small class="text-muted d-block" style="font-size: 0.68rem; text-transform: uppercase;">Feed Corroboration</small>
+                            <span class="fs-5 fw-bold text-primary font-mono">+{{ score_breakdown.feed_corroboration_bonus }}</span>
                         </div>
                     </div>
                     <div class="col-3">
-                        <div class="p-2 bg-dark rounded border border-secondary">
-                            <small class="text-muted d-block">Fidelity Bonus</small>
-                            <span class="fs-5 fw-bold text-warning">+{{ score_breakdown.indicator_type_bonus }}</span>
+                        <div class="p-2 rounded border border-secondary" style="background: rgba(15, 23, 42, 0.6) !important;">
+                            <small class="text-muted d-block" style="font-size: 0.68rem; text-transform: uppercase;">Fidelity Weight</small>
+                            <span class="fs-5 fw-bold text-warning font-mono">+{{ score_breakdown.indicator_type_bonus }}</span>
                         </div>
                     </div>
                     <div class="col-3">
-                        <div class="p-2 bg-dark rounded border border-secondary">
-                            <small class="text-muted d-block">Occurrence Bonus</small>
-                            <span class="fs-5 fw-bold text-danger">+{{ score_breakdown.repeated_hits_bonus }}</span>
+                        <div class="p-2 rounded border border-secondary" style="background: rgba(15, 23, 42, 0.6) !important;">
+                            <small class="text-muted d-block" style="font-size: 0.68rem; text-transform: uppercase;">Occurrence Bonus</small>
+                            <span class="fs-5 fw-bold text-danger font-mono">+{{ score_breakdown.repeated_hits_bonus }}</span>
                         </div>
                     </div>
                 </div>
-                <div class="d-flex align-items-center justify-content-between p-2 bg-dark rounded border border-secondary">
-                    <span class="text-secondary small">Total Computed Score:</span>
-                    <strong class="font-mono text-white fs-6">{{ score_breakdown.final_score }} / 100 ({{ score_breakdown.severity|upper }})</strong>
+                <div class="d-flex align-items-center justify-content-between p-2 rounded border border-secondary" style="background: rgba(15, 23, 42, 0.8) !important;">
+                    <span class="text-secondary small font-mono">Calibrated Composite Score:</span>
+                    <strong class="font-mono text-white fs-6">
+                        <span class="text-danger fw-bold">{{ score_breakdown.final_score }}</span> / 100
+                        <span class="badge badge-severity-{{ score_breakdown.severity }} ms-2" style="font-size: 0.72rem;">{{ score_breakdown.severity|upper }}</span>
+                    </strong>
                 </div>
             </div>
         </div>
 
-        <!-- MITRE ATT&CK Mapping -->
+        <!-- 5. MITRE ATT&CK Mapping with Rigorous Provenance (Requirement 5) -->
         <div class="card card-soc mb-4">
-            <div class="card-soc-header">
-                <span class="fw-semibold small text-uppercase"><i class="bi bi-diagram-3 me-2 text-danger"></i>Adversary Tactics & Techniques (MITRE ATT&CK)</span>
+            <div class="card-soc-header py-2 px-3 d-flex align-items-center justify-content-between">
+                <span class="fw-semibold small text-uppercase font-mono text-white">
+                    <i class="bi bi-diagram-3 me-2 text-danger"></i>Adversary Tactics & Techniques (MITRE ATT&CK)
+                </span>
+                <span class="badge bg-dark border border-secondary font-mono text-muted" style="font-size: 0.68rem;">ATT&CK MATRIX v14</span>
             </div>
-            <div class="card-body">
+            <div class="card-body p-3">
                 {% for m in mitre_list %}
-                <div class="p-3 bg-dark rounded border border-secondary mb-2">
-                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-1">
-                        <div>
-                            <span class="badge bg-danger-subtle text-danger border border-danger me-2 font-mono">{{ m.technique_id }}</span>
+                <div class="p-3 rounded border border-secondary mb-3" style="background: rgba(15, 23, 42, 0.6) !important;">
+                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <span class="badge bg-danger bg-opacity-25 text-danger border border-danger font-mono">{{ m.technique_id }}</span>
                             <strong class="text-white">{{ m.technique_name }}</strong>
+                            <span class="badge bg-secondary font-mono" style="font-size: 0.68rem;">{{ m.tactic }}</span>
                         </div>
-                        <span class="badge bg-secondary">{{ m.tactic }}</span>
+                        <div>
+                            {% if m.mapping_type == 'DIRECT' %}
+                            <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 font-mono" style="font-size: 0.68rem;">
+                                <i class="bi bi-shield-check me-1"></i>DIRECT (LOG EVIDENCE)
+                            </span>
+                            {% elif m.mapping_type == 'INTEL_CONTEXT' %}
+                            <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 font-mono" style="font-size: 0.68rem;">
+                                <i class="bi bi-tags me-1"></i>THREAT INTEL CONTEXT
+                            </span>
+                            {% else %}
+                            <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 font-mono" style="font-size: 0.68rem;">
+                                <i class="bi bi-lightbulb me-1"></i>HEURISTIC (TYPE-BASED)
+                            </span>
+                            {% endif %}
+                        </div>
                     </div>
-                    <p class="text-secondary small mb-2">{{ m.description }}</p>
-                    <a href="{{ m.url }}" target="_blank" class="small text-info text-decoration-none">
-                        <i class="bi bi-box-arrow-up-right me-1"></i> Official MITRE ATT&CK Documentation
+                    <p class="text-secondary small mb-2" style="font-size: 0.8rem; line-height: 1.4;">{{ m.description }}</p>
+                    
+                    <!-- Evidence Rationale Callout -->
+                    <div class="p-2 rounded mb-2 font-mono" style="background: rgba(0,0,0,0.3); border-left: 3px solid {% if m.mapping_type == 'DIRECT' %}var(--accent-green){% elif m.mapping_type == 'INTEL_CONTEXT' %}var(--accent-cyan){% else %}var(--accent-amber){% endif %}; font-size: 0.72rem;">
+                        <span class="text-muted">ATTRIBUTION RATIONALE:</span> <span class="text-white-50">{{ m.rationale }}</span>
+                    </div>
+
+                    <a href="{{ m.url }}" target="_blank" class="small text-info text-decoration-none font-mono" style="font-size: 0.72rem;">
+                        <i class="bi bi-box-arrow-up-right me-1"></i> Official MITRE ATT&CK Documentation &rarr;
                     </a>
                 </div>
                 {% else %}
-                <p class="text-muted small mb-0">No specific adversary technique mapped for this indicator.</p>
+                <p class="text-muted small mb-0 font-mono">No specific adversary technique mapped for this indicator.</p>
                 {% endfor %}
             </div>
         </div>
 
-        <!-- Recommended Containment Rules -->
-        <div class="card card-soc">
-            <div class="card-soc-header">
-                <span class="fw-semibold small text-uppercase"><i class="bi bi-shield-slash me-2 text-warning"></i>Containment & Remediation Rules (Passive Advisory)</span>
+        <!-- 6. Containment & Remediation Rules (Passive Advisory with Individual Copy Buttons) -->
+        <div class="card card-soc mb-4">
+            <div class="card-soc-header py-2 px-3 d-flex align-items-center justify-content-between">
+                <span class="fw-semibold small text-uppercase font-mono text-white">
+                    <i class="bi bi-shield-slash me-2 text-warning"></i>Containment & Remediation Rules (Passive Advisory)
+                </span>
+                <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 font-mono" style="font-size: 0.68rem;">
+                    MANUAL EXECUTION ONLY
+                </span>
             </div>
-            <div class="card-body">
+            <div class="card-body p-3">
+                <div class="alert alert-warning py-2 px-3 small mb-3 font-mono" style="font-size: 0.75rem; background: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.25);">
+                    <i class="bi bi-info-circle me-1"></i> <strong>Passive Advisory Policy:</strong> Rules are generated for analyst review and copy-paste execution. SENTINEL operates on a read-only telemetry architecture and never applies automated containment changes without analyst verification.
+                </div>
+
                 {% if remediation.iptables %}
                 <div class="mb-3">
-                    <label class="form-label small text-secondary">Linux iptables Rule</label>
-                    <pre class="p-2 bg-dark rounded border border-secondary font-mono text-white small mb-0">{{ remediation.iptables }}</pre>
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label small text-secondary mb-0 fw-semibold">
+                            <i class="bi bi-terminal me-1 text-info"></i>Linux iptables Drop Rule
+                        </label>
+                        <button type="button" class="btn btn-xs btn-outline-secondary font-mono py-0 px-2" style="font-size: 0.7rem;" onclick="copyCodeSnippet(this, 'iptablesPre')">
+                            <i class="bi bi-clipboard me-1"></i>Copy Rule
+                        </button>
+                    </div>
+                    <pre id="iptablesPre" class="p-2 rounded border border-secondary font-mono text-info small mb-0" style="background: #070B14; font-size: 0.78rem;">{{ remediation.iptables }}</pre>
                 </div>
                 {% endif %}
+
                 {% if remediation.windows_firewall %}
                 <div class="mb-3">
-                    <label class="form-label small text-secondary">Windows Defender Firewall (PowerShell)</label>
-                    <pre class="p-2 bg-dark rounded border border-secondary font-mono text-white small mb-0">{{ remediation.windows_firewall }}</pre>
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label small text-secondary mb-0 fw-semibold">
+                            <i class="bi bi-windows me-1 text-warning"></i>Windows Defender Firewall (PowerShell)
+                        </label>
+                        <button type="button" class="btn btn-xs btn-outline-secondary font-mono py-0 px-2" style="font-size: 0.7rem;" onclick="copyCodeSnippet(this, 'winFwPre')">
+                            <i class="bi bi-clipboard me-1"></i>Copy Rule
+                        </button>
+                    </div>
+                    <pre id="winFwPre" class="p-2 rounded border border-secondary font-mono text-warning small mb-0" style="background: #070B14; font-size: 0.78rem;">{{ remediation.windows_firewall }}</pre>
                 </div>
                 {% endif %}
+
                 {% if remediation.dns_sinkhole %}
                 <div class="mb-3">
-                    <label class="form-label small text-secondary">DNS Sinkhole Entry (/etc/hosts / Pi-hole)</label>
-                    <pre class="p-2 bg-dark rounded border border-secondary font-mono text-white small mb-0">{{ remediation.dns_sinkhole }}</pre>
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label small text-secondary mb-0 fw-semibold">
+                            <i class="bi bi-hdd-network me-1 text-success"></i>DNS Sinkhole (/etc/hosts / Pi-hole)
+                        </label>
+                        <button type="button" class="btn btn-xs btn-outline-secondary font-mono py-0 px-2" style="font-size: 0.7rem;" onclick="copyCodeSnippet(this, 'dnsPre')">
+                            <i class="bi bi-clipboard me-1"></i>Copy Rule
+                        </button>
+                    </div>
+                    <pre id="dnsPre" class="p-2 rounded border border-secondary font-mono text-success small mb-0" style="background: #070B14; font-size: 0.78rem;">{{ remediation.dns_sinkhole }}</pre>
                 </div>
                 {% endif %}
+
                 {% if remediation.suricata_snort %}
                 <div class="mb-0">
-                    <label class="form-label small text-secondary">Suricata / Snort Signature</label>
-                    <pre class="p-2 bg-dark rounded border border-secondary font-mono text-white small mb-0">{{ remediation.suricata_snort }}</pre>
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label small text-secondary mb-0 fw-semibold">
+                            <i class="bi bi-shield-exclamation me-1 text-danger"></i>Suricata / Snort Signature
+                        </label>
+                        <button type="button" class="btn btn-xs btn-outline-secondary font-mono py-0 px-2" style="font-size: 0.7rem;" onclick="copyCodeSnippet(this, 'suricataPre')">
+                            <i class="bi bi-clipboard me-1"></i>Copy Rule
+                        </button>
+                    </div>
+                    <pre id="suricataPre" class="p-2 rounded border border-secondary font-mono text-danger small mb-0" style="background: #070B14; font-size: 0.78rem;">{{ remediation.suricata_snort }}</pre>
                 </div>
                 {% endif %}
             </div>
         </div>
+
     </div>
 
-    <!-- Right Column: Case Assignment & Triage -->
+    <!-- Right Column: Case Assignment, Triage & Indicator Attribution -->
     <div class="col-lg-4">
+
+        <!-- 1. Triage & Incident Association -->
         <div class="card card-soc mb-4">
-            <div class="card-soc-header">
-                <span class="fw-semibold small text-uppercase">Triage & Case Association</span>
+            <div class="card-soc-header py-2 px-3">
+                <span class="fw-semibold small text-uppercase font-mono text-white">
+                    <i class="bi bi-clipboard-check me-2 text-info"></i>Triage & Case Association
+                </span>
             </div>
-            <div class="card-body">
+            <div class="card-body p-3">
                 <form action="/alerts/{{ alert.id }}/status" method="POST">
                     <div class="mb-3">
-                        <label class="form-label small text-secondary">Alert Lifecycle Status</label>
-                        <select name="status" class="form-select form-select-sm bg-dark border-secondary text-white" id="alertStatusSelect">
-                            <option value="new" {% if alert.status == 'new' %}selected{% endif %}>New</option>
-                            <option value="investigating" {% if alert.status == 'investigating' %}selected{% endif %}>Investigating</option>
-                            <option value="resolved" {% if alert.status == 'resolved' %}selected{% endif %}>Resolved</option>
-                            <option value="false_positive" {% if alert.status == 'false_positive' %}selected{% endif %}>False Positive</option>
+                        <label class="form-label small text-secondary fw-semibold">Alert Lifecycle Status</label>
+                        <select name="status" class="form-select form-select-sm bg-dark border-secondary text-white font-mono" style="font-size: 0.8rem;" id="alertStatusSelect">
+                            <option value="new" {% if alert.status == 'new' %}selected{% endif %}>New (Unreviewed)</option>
+                            <option value="investigating" {% if alert.status == 'investigating' %}selected{% endif %}>Investigating (Under Analysis)</option>
+                            <option value="resolved" {% if alert.status == 'resolved' %}selected{% endif %}>Resolved (Remediated)</option>
+                            <option value="false_positive" {% if alert.status == 'false_positive' %}selected{% endif %}>False Positive (Noise)</option>
                         </select>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label small text-secondary">Associated Incident Case</label>
-                        <select name="incident_id" class="form-select form-select-sm bg-dark border-secondary text-white">
+                        <label class="form-label small text-secondary fw-semibold">Associated Incident Case</label>
+                        <select name="incident_id" class="form-select form-select-sm bg-dark border-secondary text-white font-mono" style="font-size: 0.8rem;">
                             <option value="0">-- Not Associated --</option>
                             {% for inc in incidents %}
                             <option value="{{ inc.id }}" {% if alert.incident_id == inc.id %}selected{% endif %}>#{{ inc.id }}: {{ inc.title }}</option>
@@ -225,55 +433,122 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label small text-secondary">Analyst Investigation Notes</label>
-                        <textarea name="analyst_note" rows="4" class="form-control form-control-sm bg-dark border-secondary text-white font-mono" placeholder="Record evidence, affected endpoints, or justification for status changes...">{{ alert.analyst_note or '' }}</textarea>
+                        <label class="form-label small text-secondary fw-semibold">Analyst Investigation Notes</label>
+                        <textarea name="analyst_note" rows="4" class="form-control form-control-sm bg-dark border-secondary text-white font-mono" style="font-size: 0.78rem;" placeholder="Record evidence, affected endpoints, or justification for status changes...">{{ alert.analyst_note or '' }}</textarea>
                     </div>
 
                     <!-- False Positive Auto-Whitelist Feedback -->
-                    <div class="mb-3 form-check p-2 bg-dark rounded border border-secondary" id="fpSuppressBox">
+                    <div class="mb-3 form-check p-2 rounded border border-secondary" id="fpSuppressBox" style="background: rgba(15, 23, 42, 0.6);">
                         <input type="checkbox" name="suppress_ioc" value="true" class="form-check-input ms-1" id="suppressIocCheck">
-                        <label class="form-check-label ms-2 small text-secondary" for="suppressIocCheck">
-                            <strong>Suppress Indicator Globally:</strong> Add to Whitelist and deactivate IOC so future occurrences do not alert.
+                        <label class="form-check-label ms-2 small text-secondary" for="suppressIocCheck" style="font-size: 0.75rem;">
+                            <strong class="text-warning">Suppress Indicator Globally:</strong> Add to Whitelist and deactivate IOC so future log occurrences do not trigger alerts.
                         </label>
                     </div>
 
-                    <button type="submit" class="btn btn-sm btn-primary w-100">
+                    <button type="submit" class="btn btn-sm btn-primary w-100 font-mono" style="font-size: 0.82rem;">
                         <i class="bi bi-check2-circle me-1"></i> Save Alert Decision
                     </button>
                 </form>
             </div>
         </div>
 
-        <!-- Associated IOC Information Card -->
-        <div class="card card-soc">
-            <div class="card-soc-header">
-                <span class="fw-semibold small text-uppercase">Threat Indicator Attribution</span>
+        <!-- 2. Threat Indicator Attribution Card (Requirement 4) -->
+        <div class="card card-soc mb-4">
+            <div class="card-soc-header py-2 px-3 d-flex align-items-center justify-content-between">
+                <span class="fw-semibold small text-uppercase font-mono text-white">
+                    <i class="bi bi-fingerprint me-2 text-primary"></i>Indicator Attribution
+                </span>
+                <span class="badge bg-{{ provenance_badge }} bg-opacity-10 text-{{ provenance_badge }} border border-{{ provenance_badge }} border-opacity-25 font-mono" style="font-size: 0.65rem;">
+                    {{ provenance_label }}
+                </span>
             </div>
-            <div class="card-body">
+            <div class="card-body p-3">
                 {% if ioc %}
-                <div class="mb-2">
-                    <span class="text-muted small d-block">Source Feed Attribution:</span>
-                    {% for src in ioc.sources %}
-                    <span class="badge bg-secondary me-1 mb-1">{{ src.feed_name }}</span>
-                    {% else %}
-                    <span class="text-muted small">Internal Threat Repository</span>
-                    {% endfor %}
+                <!-- Source Provenance Notice Callout -->
+                <div class="p-2 rounded mb-3 border font-mono small" style="background: rgba(15, 23, 42, 0.6); border-color: {% if is_demonstration_ioc %}rgba(245, 158, 11, 0.3){% else %}rgba(16, 185, 129, 0.3){% endif %} !important; font-size: 0.72rem;">
+                    <span class="fw-semibold {% if is_demonstration_ioc %}text-warning{% else %}text-success{% endif %}">
+                        <i class="bi {% if is_demonstration_ioc %}bi-exclamation-triangle{% else %}bi-check-circle{% endif %} me-1"></i>Provenance Notice:
+                    </span>
+                    <span class="text-white-50 d-block mt-1">{{ provenance_desc }}</span>
                 </div>
-                <div class="mb-2">
-                    <span class="text-muted small d-block">Threat Tags:</span>
-                    {% for tag in ioc.tags %}
-                    <span class="badge bg-dark border border-secondary me-1 font-mono small">{{ tag }}</span>
-                    {% endfor %}
+
+                <div class="mb-3">
+                    <span class="text-muted small d-block font-mono mb-1" style="font-size: 0.7rem; text-transform: uppercase;">Source Feed Connectors:</span>
+                    <div class="d-flex flex-wrap gap-1">
+                        {% for src in ioc.sources %}
+                            {% if src.feed_name.lower() in ['samplefeed', 'mock', 'demo'] %}
+                            <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 font-mono" style="font-size: 0.7rem;">
+                                <i class="bi bi-flask me-1"></i>SampleFeed (Synthetic Lab)
+                            </span>
+                            {% else %}
+                            <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 font-mono" style="font-size: 0.7rem;">
+                                <i class="bi bi-broadcast me-1"></i>{{ src.feed_name }}
+                            </span>
+                            {% endif %}
+                        {% else %}
+                        <span class="text-muted small font-mono">Internal Threat Repository</span>
+                        {% endfor %}
+                    </div>
                 </div>
-                <a href="/iocs/{{ ioc.id }}" class="btn btn-xs btn-outline-info w-100 mt-2">
-                    <i class="bi bi-database me-1"></i> View Full IOC Record
+
+                <div class="mb-3">
+                    <span class="text-muted small d-block font-mono mb-1" style="font-size: 0.7rem; text-transform: uppercase;">Threat Tags:</span>
+                    <div class="d-flex flex-wrap gap-1">
+                        {% for tag in ioc.tags %}
+                        <span class="badge bg-dark border border-secondary text-info font-mono" style="font-size: 0.7rem;">#{{ tag }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="mb-3 pt-2 border-top text-secondary small font-mono" style="border-color: rgba(255,255,255,0.06) !important; font-size: 0.72rem;">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted">Repository Confidence:</span>
+                        <strong class="text-white">{{ ioc.confidence }}/100</strong>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Active Status:</span>
+                        <strong class="{% if ioc.is_active %}text-success{% else %}text-danger{% endif %}">{{ "Active" if ioc.is_active else "Deactivated" }}</strong>
+                    </div>
+                </div>
+
+                <a href="/iocs/{{ ioc.id }}" class="btn btn-sm btn-outline-info w-100 font-mono" style="font-size: 0.75rem;">
+                    <i class="bi bi-database me-1"></i> View Full IOC Record &rarr;
                 </a>
                 {% else %}
-                <p class="text-muted small mb-0">Direct log extraction indicator.</p>
+                <p class="text-muted small mb-0 font-mono">Direct security log extraction indicator.</p>
                 {% endif %}
             </div>
         </div>
+
     </div>
 </div>
 {% endblock %}
 
+{% block scripts %}
+<script>
+function copyIocValue(val, btn) {
+    navigator.clipboard.writeText(val).then(() => {
+        var originalHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="bi bi-check2 text-success me-1"></i><span>Copied!</span>';
+        btn.classList.add('border-success');
+        setTimeout(() => {
+            btn.innerHTML = originalHtml;
+            btn.classList.remove('border-success');
+        }, 2000);
+    });
+}
+
+function copyCodeSnippet(btn, preId) {
+    var text = document.getElementById(preId).textContent;
+    navigator.clipboard.writeText(text).then(() => {
+        var originalHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="bi bi-check2 text-success me-1"></i><span>Copied!</span>';
+        btn.classList.add('border-success');
+        setTimeout(() => {
+            btn.innerHTML = originalHtml;
+            btn.classList.remove('border-success');
+        }, 2000);
+    });
+}
+</script>
+{% endblock %}

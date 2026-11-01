@@ -20,11 +20,13 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./threat_intel.db"
     AUTO_INGEST_DIR: str = "./auto_ingest"
     ALERT_WEBHOOK_URL: str = ""
+    ALERT_WEBHOOK_URL_ENCRYPTED: str = ""
     
     # Enrichment and correlation settings
     GEOIP_DB_PATH: str = "./GeoLite2-City.mmdb"
     DEDUPLICATION_WINDOW_MINUTES: int = 60 # 1 hour aggregation window
     BATCH_SIZE: int = 500 # Log processing transaction batch size
+    LOG_FRESHNESS_THRESHOLD_HOURS: int = 24 # Consider telemetry stale if no logs ingested within 24h
 
     class Config:
         env_file = ".env"

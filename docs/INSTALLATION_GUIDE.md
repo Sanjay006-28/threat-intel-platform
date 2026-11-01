@@ -89,7 +89,7 @@ Navigate to `http://localhost:8000`.
 ## 4. Verification Check
 After launch, confirm proper initialization:
 ```powershell
-.\.venv\Scripts\python.exe test_match.py
+.\.venv\Scripts\python.exe tests/test_match.py
 ```
 Output should confirm: `Loaded 39522 IOCs. Total Matches: 8`.
 

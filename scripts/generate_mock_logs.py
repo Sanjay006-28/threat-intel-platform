@@ -5,10 +5,16 @@ Generates a realistic demo security log file with:
   - malicious IOC hits (IPs, URLs, hashes, domains, emails)
 """
 
+import os
 from datetime import datetime, timedelta
 import random
 
-def generate_sample_log_file(filename: str = "demo_security.log"):
+def generate_sample_log_file(filename: str = None):
+    if filename is None:
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        demo_dir = os.path.join(base_dir, "demo_logs")
+        os.makedirs(demo_dir, exist_ok=True)
+        filename = os.path.join(demo_dir, "demo_security.log")
     base_time = datetime(2026, 9, 30, 10, 0, 0)
     
     def ts(offset_secs: int) -> str:

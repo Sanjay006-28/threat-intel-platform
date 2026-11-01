@@ -3,78 +3,121 @@
 {% block title %}SENTINEL // Incident #{{ incident.id }} - {{ incident.title }}{% endblock %}
 
 {% block content %}
+<!-- Validation / Error Banner -->
+{% if error_msg %}
+<div class="alert alert-danger d-flex align-items-center justify-content-between border-0 bg-danger-subtle text-danger py-2 px-3 mb-4 rounded-3 shadow-sm alert-dismissible fade show" role="alert">
+    <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-exclamation-triangle-fill fs-5 flex-shrink-0"></i>
+        <span>{{ error_msg }}</span>
+    </div>
+    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+{% endif %}
+
+<!-- Soft-Deleted Archive Notice -->
+{% if incident.is_deleted %}
+<div class="alert alert-warning d-flex align-items-center justify-content-between border-0 bg-warning bg-opacity-10 text-warning py-3 px-3 mb-4 rounded-3 shadow-sm" role="alert">
+    <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-archive-fill fs-4 flex-shrink-0"></i>
+        <div>
+            <div class="fw-bold">Archived Incident Case</div>
+            <div class="small text-muted">This incident was soft-deleted on {{ incident.deleted_at.strftime('%Y-%m-%d %H:%M:%S UTC') if incident.deleted_at else '--' }} by {{ incident.deleted_by or 'Analyst' }}. Associated alerts and log evidence remain fully preserved.</div>
+        </div>
+    </div>
+    <form action="/incidents/{{ incident.id }}/restore" method="POST" class="d-inline mb-0">
+        <button type="submit" class="btn btn-sm btn-success px-3">
+            <i class="bi bi-arrow-counterclockwise me-1"></i> Restore Incident
+        </button>
+    </form>
+</div>
+{% endif %}
+
 <div class="mb-4">
-    <a href="/incidents" class="btn btn-sm btn-outline-secondary mb-3">
-        <i class="bi bi-arrow-left me-1"></i> Back to Incidents
-    </a>
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+        <div class="d-flex align-items-center gap-2">
+            <a href="/incidents" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i> Back to Incidents
+            </a>
+            {% if not incident.is_deleted %}
+            <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteIncidentModal" title="Delete Incident">
+                <i class="bi bi-trash3 me-1"></i> Delete Incident
+            </button>
+            {% endif %}
+        </div>
+        <div class="font-mono text-muted small">
+            Created: {{ incident.created_at.strftime('%Y-%m-%d %H:%M:%S UTC') if incident.created_at else '--' }}
+            {% if incident.updated_at and incident.updated_at != incident.created_at %}
+            <span class="ms-2 d-none d-md-inline">| Updated: {{ incident.updated_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}</span>
+            {% endif %}
+        </div>
+    </div>
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
         <div>
-            <div class="d-flex align-items-center gap-2 mb-1">
+            <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
                 <span class="badge bg-secondary font-mono">INCIDENT #{{ incident.id }}</span>
                 <span class="badge badge-severity-{{ incident.severity }}">{{ incident.severity|upper }}</span>
                 <span class="badge {% if incident.status in ['open', 'investigating'] %}bg-danger{% elif incident.status == 'contained' %}bg-warning text-dark{% else %}bg-success{% endif %}">
                     {{ incident.status|upper }}
                 </span>
             </div>
-            <h3 class="fw-bold text-white mb-0">{{ incident.title }}</h3>
-        </div>
-        <div class="font-mono text-muted small">
-            Created: {{ incident.created_at.strftime('%Y-%m-%d %H:%M:%S UTC') if incident.created_at else '--' }}
+            <h3 class="fw-bold text-white mb-0 text-break">{{ incident.title }}</h3>
         </div>
     </div>
 </div>
 
 <div class="row g-4">
-    <!-- Left Column: Details & Associated Alerts -->
-    <div class="col-lg-8">
+    <!-- Left Column: Scope & Associated Alerts (col-12 col-lg-7) -->
+    <div class="col-12 col-lg-7">
         <!-- Description -->
         <div class="card card-soc mb-4">
             <div class="card-soc-header">
-                <span class="fw-semibold small text-uppercase">Case Scope & Description</span>
+                <span class="fw-semibold small text-uppercase" style="letter-spacing: 0.05em;">Case Scope & Description</span>
             </div>
             <div class="card-body">
-                <p class="text-secondary mb-0">{{ incident.description or "No formal description provided." }}</p>
+                <p class="text-secondary mb-0" style="white-space: pre-wrap; line-height: 1.6;">{{ incident.description or "No formal description provided." }}</p>
             </div>
         </div>
 
         <!-- Associated Security Alerts -->
         <div class="card card-soc mb-4">
             <div class="card-soc-header d-flex align-items-center justify-content-between">
-                <span class="fw-semibold small text-uppercase">Associated Alerts ({{ alerts|length }})</span>
+                <span class="fw-semibold small text-uppercase" style="letter-spacing: 0.05em;">Associated Alerts ({{ alerts|length }})</span>
                 <button class="btn btn-xs btn-outline-primary" data-bs-toggle="modal" data-bs-target="#attachAlertModal">
                     <i class="bi bi-link-45deg me-1"></i> Link Alert
                 </button>
             </div>
             <div class="table-responsive">
-                <table class="table table-soc mb-0">
+                <table class="table table-soc mb-0 align-middle" style="table-layout: fixed; width: 100%;">
                     <thead>
                         <tr>
-                            <th>Alert</th>
-                            <th>Matched Indicator</th>
-                            <th>Severity</th>
-                            <th>Hits</th>
-                            <th>Last Seen</th>
-                            <th>Actions</th>
+                            <th style="width: 58px; white-space: nowrap;">#</th>
+                            <th style="width: 170px; white-space: nowrap;">Indicator</th>
+                            <th style="width: 85px; text-align: center; white-space: nowrap;">Severity</th>
+                            <th style="width: 50px; text-align: center; white-space: nowrap;">Hits</th>
+                            <th style="width: 90px; text-align: center; white-space: nowrap;">Time</th>
+                            <th style="width: 78px; text-align: right; white-space: nowrap;">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for a in alerts %}
                         <tr>
-                            <td class="font-mono text-muted">#{{ a.id }}</td>
-                            <td>
-                                <span class="badge bg-secondary font-mono me-1">{{ a.matched_type }}</span>
-                                <span class="font-mono text-info fw-semibold">{{ a.matched_value }}</span>
+                            <td class="font-mono text-muted small" style="white-space: nowrap;">#{{ a.id }}</td>
+                            <td style="overflow: hidden; text-overflow: ellipsis;">
+                                <div class="d-flex align-items-center gap-1 text-truncate" title="{{ a.matched_value }}">
+                                    <span class="badge bg-secondary font-mono flex-shrink-0" style="font-size: 0.68rem; padding: 2px 4px;">{{ a.matched_type }}</span>
+                                    <span class="font-mono text-info fw-semibold text-truncate small">{{ a.matched_value }}</span>
+                                </div>
                             </td>
-                            <td><span class="badge badge-severity-{{ a.severity }}">{{ a.severity }}</span></td>
-                            <td class="font-mono"><span class="badge bg-dark border border-secondary">{{ a.hit_count or 1 }}x</span></td>
-                            <td class="font-mono small text-muted">{{ a.last_seen.strftime('%H:%M:%S') if a.last_seen else '--' }}</td>
-                            <td>
-                                <div class="d-flex align-items-center gap-1">
-                                    <a href="/alerts/{{ a.id }}" class="btn btn-xs btn-outline-info" title="Inspect Alert">
+                            <td class="text-center"><span class="badge badge-severity-{{ a.severity }}">{{ a.severity|upper }}</span></td>
+                            <td class="font-mono text-center"><span class="badge bg-dark border border-secondary">{{ a.hit_count or 1 }}x</span></td>
+                            <td class="font-mono text-center text-muted" style="font-size: 0.78rem; white-space: nowrap;">{{ a.last_seen.strftime('%H:%M:%S') if a.last_seen else '--' }}</td>
+                            <td style="text-align: right; white-space: nowrap;">
+                                <div class="d-inline-flex align-items-center gap-1">
+                                    <a href="/alerts/{{ a.id }}" class="btn btn-xs btn-outline-info px-2 py-0" title="Inspect Alert">
                                         <i class="bi bi-eye"></i>
                                     </a>
-                                    <form action="/incidents/{{ incident.id }}/remove_alert/{{ a.id }}" method="POST">
-                                        <button class="btn btn-xs btn-outline-danger" title="Unlink from Incident">
+                                    <form action="/incidents/{{ incident.id }}/remove_alert/{{ a.id }}" method="POST" class="d-inline mb-0">
+                                        <button class="btn btn-xs btn-outline-danger px-2 py-0" title="Unlink Alert">
                                             <i class="bi bi-x"></i>
                                         </button>
                                     </form>
@@ -94,53 +137,113 @@
         </div>
     </div>
 
-    <!-- Right Column: Case Management & Resolution -->
-    <div class="col-lg-4">
+    <!-- Right Column: Case Management & Resolution (col-12 col-lg-5) -->
+    <div class="col-12 col-lg-5">
         <div class="card card-soc mb-4">
             <div class="card-soc-header">
-                <span class="fw-semibold small text-uppercase">Triage & Management</span>
+                <span class="fw-semibold small text-uppercase" style="letter-spacing: 0.05em;"><i class="bi bi-sliders me-1 text-info"></i> Triage & Management</span>
             </div>
             <div class="card-body">
                 <form action="/incidents/{{ incident.id }}/update" method="POST">
-                    <div class="mb-3">
-                        <label class="form-label small text-secondary">Incident Status</label>
-                        <select name="status" class="form-select form-select-sm bg-dark border-secondary text-white">
-                            <option value="open" {% if incident.status == 'open' %}selected{% endif %}>Open</option>
-                            <option value="investigating" {% if incident.status == 'investigating' %}selected{% endif %}>Investigating</option>
-                            <option value="contained" {% if incident.status == 'contained' %}selected{% endif %}>Contained</option>
-                            <option value="resolved" {% if incident.status == 'resolved' %}selected{% endif %}>Resolved</option>
-                            <option value="closed" {% if incident.status == 'closed' %}selected{% endif %}>Closed</option>
-                        </select>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label small text-secondary mb-1">Incident Status</label>
+                            <select name="status" class="form-select form-select-sm bg-dark border-secondary text-white">
+                                <option value="open" {% if incident.status == 'open' %}selected{% endif %}>Open</option>
+                                <option value="investigating" {% if incident.status == 'investigating' %}selected{% endif %}>Investigating</option>
+                                <option value="contained" {% if incident.status == 'contained' %}selected{% endif %}>Contained</option>
+                                <option value="resolved" {% if incident.status == 'resolved' %}selected{% endif %}>Resolved</option>
+                                <option value="closed" {% if incident.status == 'closed' %}selected{% endif %}>Closed</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small text-secondary mb-1">Severity Assessment</label>
+                            <select name="severity" class="form-select form-select-sm bg-dark border-secondary text-white">
+                                <option value="low" {% if incident.severity == 'low' %}selected{% endif %}>Low</option>
+                                <option value="medium" {% if incident.severity == 'medium' %}selected{% endif %}>Medium</option>
+                                <option value="high" {% if incident.severity == 'high' %}selected{% endif %}>High</option>
+                                <option value="critical" {% if incident.severity == 'critical' %}selected{% endif %}>Critical</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label small text-secondary">Severity Assessment</label>
-                        <select name="severity" class="form-select form-select-sm bg-dark border-secondary text-white">
-                            <option value="low" {% if incident.severity == 'low' %}selected{% endif %}>Low</option>
-                            <option value="medium" {% if incident.severity == 'medium' %}selected{% endif %}>Medium</option>
-                            <option value="high" {% if incident.severity == 'high' %}selected{% endif %}>High</option>
-                            <option value="critical" {% if incident.severity == 'critical' %}selected{% endif %}>Critical</option>
-                        </select>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label small text-secondary">Analyst Working Notes</label>
+                        <label class="form-label small text-secondary mb-1">Analyst Working Notes</label>
                         <textarea name="analyst_notes" rows="4" class="form-control form-control-sm bg-dark border-secondary text-white font-mono" placeholder="Document investigation findings, compromised hosts, root causes...">{{ incident.analyst_notes or '' }}</textarea>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label small text-secondary">Resolution Summary</label>
+                        <label class="form-label small text-secondary mb-1">Resolution Summary</label>
                         <textarea name="resolution_summary" rows="3" class="form-control form-control-sm bg-dark border-secondary text-white" placeholder="Actions taken to remediate and close this incident...">{{ incident.resolution_summary or '' }}</textarea>
                     </div>
 
-                    <button type="submit" class="btn btn-sm btn-primary w-100">
+                    <button type="submit" class="btn btn-sm btn-primary w-100 py-2 fw-semibold">
                         <i class="bi bi-save me-1"></i> Update Case File
+                    </button>
+                </form>
+
+                {% if not incident.is_deleted %}
+                <hr class="border-secondary my-3">
+                <div class="d-flex align-items-center justify-content-between">
+                    <span class="text-secondary small">Case lifecycle action:</span>
+                    <button type="button" class="btn btn-xs btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteIncidentModal" title="Delete Incident">
+                        <i class="bi bi-trash3 me-1"></i> Delete Case
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if not incident.is_deleted %}
+<!-- Modal: Confirm Delete Incident -->
+<div class="modal fade" id="deleteIncidentModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark border border-danger text-white shadow-lg">
+            <div class="modal-header border-secondary bg-danger bg-opacity-10">
+                <h5 class="modal-title fs-6 text-danger" id="deleteModalLabel">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>Confirm Incident Deletion
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="p-3 mb-3 rounded bg-surface border border-secondary">
+                    <div class="text-secondary small text-uppercase fw-semibold mb-1">Target Incident Case</div>
+                    <div class="fw-bold fs-6 text-white mb-1">#{{ incident.id }} – {{ incident.title }}</div>
+                    <div class="d-flex align-items-center gap-2 mt-2">
+                        <span class="badge badge-severity-{{ incident.severity }}">{{ incident.severity|upper }}</span>
+                        <span class="badge bg-secondary font-mono">{{ incident.status|upper }}</span>
+                        <span class="badge bg-dark border border-secondary font-mono">{{ alerts|length }} Linked Alerts</span>
+                    </div>
+                </div>
+                
+                <div class="alert alert-warning border-0 bg-warning bg-opacity-10 text-warning py-2 px-3 mb-3 small" role="alert">
+                    <i class="bi bi-info-circle-fill me-1"></i>
+                    <strong>Notice:</strong> This incident will be removed from the active Incident Cases ledger.
+                </div>
+
+                <div class="text-secondary small">
+                    <p class="mb-1"><i class="bi bi-shield-check text-success me-1"></i> <strong>Evidence Preservation Guarantee:</strong></p>
+                    <ul class="ps-3 mb-0 text-muted">
+                        <li>Associated security alerts remain completely preserved.</li>
+                        <li>Original security log events and forensic telemetry are untouched.</li>
+                        <li>This incident can be restored at any time from the Deleted Cases tab.</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form action="/incidents/{{ incident.id }}/delete" method="POST" class="d-inline mb-0">
+                    <button type="submit" class="btn btn-sm btn-danger px-3">
+                        <i class="bi bi-trash3 me-1"></i> Confirm Delete
                     </button>
                 </form>
             </div>
         </div>
     </div>
 </div>
+{% endif %}
 
 <!-- Modal: Link Alert -->
 <div class="modal fade" id="attachAlertModal" tabindex="-1">

@@ -165,6 +165,22 @@
             min-height: calc(100vh - 64px);
         }
 
+        @media (max-width: 1440px) {
+            .soc-main {
+                padding: 1.5rem 1.75rem;
+            }
+        }
+
+        @media (max-width: 992px) {
+            .soc-sidebar {
+                display: none;
+            }
+            .soc-main {
+                margin-left: 0;
+                padding: 1.25rem 1rem;
+            }
+        }
+
         /* Custom Cards & Panels */
         .card-soc {
             background: var(--bg-surface);
@@ -344,9 +360,9 @@
             <div class="d-none d-md-flex align-items-center gap-3 ms-4 ps-3 border-start border-secondary" style="border-color: var(--border-subtle) !important;">
                 <div class="d-flex align-items-center gap-2">
                     <span class="status-pulse-dot"></span>
-                    <span class="text-secondary small fw-medium" style="font-size: 0.75rem; letter-spacing: 0.05em;">TELEMETRY LIVE</span>
+                    <span class="text-secondary small fw-medium" style="font-size: 0.75rem; letter-spacing: 0.05em;">SYSTEM ACTIVE</span>
                 </div>
-                <div class="font-mono text-muted small" id="live-utc-clock" style="font-size: 0.75rem;">
+                <div class="font-mono text-info small" id="live-utc-clock" style="font-size: 0.75rem;" title="Synchronized Platform Time">
                     --:--:-- UTC
                 </div>
             </div>
@@ -406,7 +422,7 @@
         </a>
         <a class="soc-nav-item {% if request.url.path == '/settings' %}active{% endif %}" href="/settings">
             <i class="bi bi-shield-check"></i>
-            <span>Whitelist Policies</span>
+            <span>Whitelist & Settings</span>
         </a>
 
         <div class="sidebar-section-title">Ingestion & Analysis</div>
@@ -440,12 +456,16 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <script>
-        // Live UTC clock updater
+        // Live Clock updater (shows UTC and local time in tooltip)
         function updateUTCClock() {
             const now = new Date();
             const utcString = now.toUTCString().split(' ')[4] + ' UTC';
+            const localString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
             const el = document.getElementById('live-utc-clock');
-            if (el) el.textContent = utcString;
+            if (el) {
+                el.textContent = utcString;
+                el.title = `Local Analyst Time: ${localString} | Standardized UTC: ${utcString}`;
+            }
         }
         setInterval(updateUTCClock, 1000);
         updateUTCClock();

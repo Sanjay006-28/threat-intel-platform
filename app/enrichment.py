@@ -45,7 +45,7 @@ def get_reverse_dns(ip: str, timeout: float = 1.0) -> Optional[str]:
     except Exception:
         return None
 
-def enrich_ip(ip: str, timeout: float = 1.5) -> Dict[str, Any]:
+def enrich_ip(ip: str, timeout: float = 1.5, skip_rdns: bool = False) -> Dict[str, Any]:
     """
     Enriches an IP with GeoIP, Country, ISP/Org, ASN, Coordinates (Lat/Lon), and Reverse DNS.
     Uses bounded TTL caching and fails safely without hanging page requests.
@@ -79,6 +79,8 @@ def enrich_ip(ip: str, timeout: float = 1.5) -> Dict[str, Any]:
                 "city": "Local Network",
                 "isp": "Enterprise Intranet",
                 "org": "Private RFC1918 Subnet",
+                "lat": 0.0,
+                "lon": 0.0,
                 "is_enriched": True
             })
             _put_in_cache(ip, enrichment_data)
@@ -86,8 +88,9 @@ def enrich_ip(ip: str, timeout: float = 1.5) -> Dict[str, Any]:
     except ValueError:
         return enrichment_data
 
-    # 1. Reverse DNS with socket timeout
-    enrichment_data["reverse_dns"] = get_reverse_dns(ip, timeout=1.0)
+    # 1. Reverse DNS with socket timeout (optional, skipped for fast map rendering)
+    if not skip_rdns:
+        enrichment_data["reverse_dns"] = get_reverse_dns(ip, timeout=1.0)
 
     # 2. GeoIP / ASN via secure TLS endpoint (HTTPS) with strict timeout to prevent plaintext data leakage
     try:
