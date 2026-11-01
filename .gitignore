@@ -60,4 +60,6 @@ Thumbs.db
 *.jpeg
 *.gif
 docs/screenshots/
+!figures/
+!figures/*.png
 

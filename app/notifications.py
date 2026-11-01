@@ -2,6 +2,7 @@ import ipaddress
 import logging
 import socket
 import urllib.parse
+import concurrent.futures
 from typing import Dict, Any, Optional, Tuple
 import requests
 from requests.adapters import HTTPAdapter
@@ -311,3 +312,36 @@ def send_alert_webhook(
     except Exception as e:
         logger.error(f"[!] Webhook error: {str(e)[:100]}")
         return False, f"Dispatch failure: {str(e)[:100]}"
+
+
+# Dedicated background thread pool for asynchronous, non-blocking webhook dispatches
+_webhook_pool = concurrent.futures.ThreadPoolExecutor(
+    max_workers=4,
+    thread_name_prefix="sentinel_webhook"
+)
+
+def send_alert_webhook_async(
+    alert_id: int,
+    matched_value: str,
+    matched_type: str,
+    severity: str,
+    score: int,
+    webhook_url: Optional[str] = None,
+    allow_insecure_for_test: bool = False
+) -> concurrent.futures.Future:
+    """
+    Dispatches alert notification webhook in a background worker thread.
+    Prevents external network latency, slow endpoints, or timeouts from blocking
+    the real-time log ingestion and correlation pipeline.
+    """
+    return _webhook_pool.submit(
+        send_alert_webhook,
+        alert_id=alert_id,
+        matched_value=matched_value,
+        matched_type=matched_type,
+        severity=severity,
+        score=score,
+        webhook_url=webhook_url,
+        allow_insecure_for_test=allow_insecure_for_test
+    )
+

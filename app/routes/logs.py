@@ -42,18 +42,14 @@ def ingest_and_correlate_stream(db: Session, log_file: LogFile, file_path: str, 
             if len(batch) >= batch_limit:
                 db.add_all(batch)
                 db.flush()
-                for ev in batch:
-                    correlator.correlate_event(ev)
-                db.commit()
+                correlator.correlate_batch(batch)
                 batch.clear()
                 
         # Final remaining batch
         if batch:
             db.add_all(batch)
             db.flush()
-            for ev in batch:
-                correlator.correlate_event(ev)
-            db.commit()
+            correlator.correlate_batch(batch)
             batch.clear()
 
         log_file.line_count = line_count

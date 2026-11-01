@@ -103,6 +103,7 @@ class Correlator:
         self.whitelist_cidrs: List[Tuple[Any, Whitelist]] = []
         self.whitelist_urls: Dict[str, Whitelist] = {}
         self.whitelist_hashes: Dict[str, Whitelist] = {}
+        self._pending_alerts: Dict[str, Alert] = {}
 
         active_policies = self.db.query(Whitelist).filter(
             Whitelist.is_active == True,
@@ -125,7 +126,10 @@ class Correlator:
             if typ == "domain":
                 self.whitelist_domains[val.lower()] = w
             elif typ == "url" or "://" in val:
-                self.whitelist_urls[val.lower()] = w
+                u_clean = val.lower().strip()
+                self.whitelist_urls[u_clean] = w
+                self.whitelist_urls[u_clean.rstrip("/")] = w
+                self.whitelist_urls[u_clean.rstrip("/") + "/"] = w
             elif typ == "ipv6" or (":" in val and "/" not in val and "://" not in val):
                 try:
                     ip_v6 = ipaddress.IPv6Address(val)
@@ -149,6 +153,12 @@ class Correlator:
         
         for ioc in self.active_iocs:
             self.exact_matches[ioc.value] = ioc
+
+            # URL trailing slash tolerance: index both with and without trailing slash
+            if ioc.type == "url" or "://" in ioc.value:
+                u_val = ioc.value.strip()
+                self.exact_matches[u_val.rstrip("/")] = ioc
+                self.exact_matches[u_val.rstrip("/") + "/"] = ioc
 
             if ioc.type == "domain":
                 self.domains.add(ioc.value.lower())
